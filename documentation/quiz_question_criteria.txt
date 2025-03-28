@@ -1,0 +1,47 @@
+Clinical Areas
+	1.	Cardiovascular diseases (blood pressure, heart failure, arrhythmias)
+	2.	Respiratory diseases (asthma, COPD, allergies)
+	3.	Gastrointestinal diseases (reflux, ulcers, constipation, diarrhea)
+	4.	Neurological diseases (epilepsy, migraine, Parkinson’s disease)
+	5.	Psychiatric disorders (depression, anxiety disorders, schizophrenia)
+	6.	Diabetes (type 1, type 2, insulin therapy, oral medication)
+	7.	Endocrine disorders (thyroid disorders, adrenal diseases)
+	8.	Urological diseases (urinary tract infections, incontinence, prostate issues)
+	9.	Gynecology and contraception (hormone therapy, contraception, pregnancy)
+	10.	Dermatological diseases (eczema, psoriasis, acne, wound care)
+	11.	Rheumatological diseases (osteoarthritis, rheumatoid arthritis, gout)
+	12.	Oncology (chemotherapy side effects, supportive therapy)
+	13.	Hematological disorders (anemia, coagulation disorders)
+	14.	Infectious diseases (antibiotics, viral infections, vaccinations)
+	15.	Ophthalmology (glaucoma, conjunctivitis, dry eyes)
+	16.	Ear, nose, and throat (ENT) diseases (cold, allergic rhinitis, ear infections)
+	17.	Pain management (NSAIDs, opioids, neuropathic pain)
+	18.	Emergency situations (anaphylaxis, intoxications, epileptic seizures)
+	19.	Musculoskeletal system (osteoporosis, muscle pain, injuries)
+	20.	Metabolic diseases (hypercholesterolemia, gout)
+	21.	Vitamin deficiencies & supplements (vitamin D, B12, iron)
+
+
+	Knowledge Categories
+	1.	Indications – Approved and off-label uses of the medication.
+	2.	Mechanism of Action – How the drug works in the body.
+	3.	Pharmacokinetics – Absorption, distribution, metabolism, and excretion (ADME).
+	4.	Pharmacodynamics – Effects of the drug on the body and its targets.
+	5.	Dosing – Recommended doses, dose ranges, and modifications for renal/hepatic impairment.
+	6.	Administration – How to take/administer the medication (e.g., with food, injection technique).
+	7.	Interactions – Drug-drug, drug-food, and drug-disease interactions.
+	8.	Contraindications – Conditions in which the drug should not be used.
+	9.	Side Effects – Common, rare, and serious adverse effects.
+	10.	Monitoring – Lab tests, clinical signs, and other parameters to track safety and efficacy.
+	11.	Storage and Stability – Proper storage conditions and shelf-life.
+	12.	Discontinuation – How to safely taper or stop the medication.
+
+	Patient Categories:
+	1.	Pediatric – All patients under 18 years, without separate neonatal/adolescent categories.
+	2.	Adults (without specific conditions) – General adult population, excluding those in special groups.
+	3.	Elderly – Typically defined as 65+ years, with considerations for altered pharmacokinetics and polypharmacy.
+	4.	Pregnancy and Lactation – Patients who are pregnant or breastfeeding, requiring special safety considerations.
+	5.	Renal Impairment – Patients with chronic kidney disease (CKD) or acute renal failure, requiring dose adjustments.
+	6.	Hepatic Impairment – Patients with liver disease, affecting drug metabolism and toxicity.
+	7.	Immunocompromised Patients – Includes HIV/AIDS, chemotherapy patients, organ transplant recipients, and other immune deficiencies.
+	8.	Obese Patients – Patients with high BMI, requiring adjusted dosing for certain medications.

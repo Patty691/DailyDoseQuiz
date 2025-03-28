@@ -1,0 +1,6 @@
+
+gebruikers aantallen:
+https://www.gipdatabank.nl/databank?infotype=g&label=00-totaal&tabel_d_00-totaal=B_01-basis&tabel_g_00-totaal=R_46_top500_atclaatst&tabel_h_00-totaal=B_01-basis&geg=gebr&spec=&item=
+
+informatie over medicatie:
+www.apotheek.nl

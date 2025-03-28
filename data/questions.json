@@ -1,0 +1,113 @@
+[
+    {
+        "id": "id_value",
+        "question": "question_value",
+        "options": [
+            "option1",
+            "option2",
+            "option3",
+            "option4"
+        ],
+        "answer": "answer_value",
+        "explanation": "This is the explanation for why the correct answer is correct.",
+        "clinical_area": "clinical_area",
+        "knowledge_category": "knowledge_category",
+        "difficulty": "difficulty_value",
+        "approved": false,
+        "statistics": {
+            "date_shown": null,
+            "total_responses": 0,
+            "correctly_answered": 0,
+            "total_answered": {
+                "option1": 0,
+                "option2": 0,
+                "option3": 0,
+                "option4": 0
+            }
+        }
+    },
+    {
+        "id": "test001",
+        "question": "Which of the following is a common side effect of beta-blockers?",
+        "options": [
+            "Bradycardia",
+            "Hypertension",
+            "Insomnia",
+            "Increased appetite"
+        ],
+        "answer": "Bradycardia",
+        "explanation": "Beta-blockers slow the heart rate, which can lead to bradycardia as a common side effect.",
+        "clinical_area": "Cardiovascular",
+        "knowledge_category": "Side Effects",
+        "difficulty": "Medium",
+        "target_audience": "Pharmacists",
+        "approved": false,
+        "statistics": {
+            "date_shown": null,
+            "total_responses": 0,
+            "correctly_answered": 0,
+            "total_answered": {
+                "Bradycardia": 0,
+                "Hypertension": 0,
+                "Insomnia": 0,
+                "Increased appetite": 0
+            }
+        }
+    },
+    {
+        "id": "test002",
+        "question": "Which antibiotic class is most commonly associated with tendon rupture?",
+        "options": [
+            "Macrolides",
+            "Fluoroquinolones",
+            "Cephalosporins",
+            "Tetracyclines"
+        ],
+        "answer": "Fluoroquinolones",
+        "explanation": "Fluoroquinolones can weaken tendons and increase the risk of rupture, especially in elderly patients.",
+        "clinical_area": "Infectious Diseases",
+        "knowledge_category": "Side Effects",
+        "difficulty": "Hard",
+        "target_audience": "Doctors",
+        "approved": true,
+        "statistics": {
+            "date_shown": "2025-03-25",
+            "total_responses": 0,
+            "correctly_answered": 0,
+            "total_answered": {
+                "Macrolides": 0,
+                "Fluoroquinolones": 0,
+                "Cephalosporins": 0,
+                "Tetracyclines": 0
+            }
+        }
+    },
+    {
+        "id": "test003",
+        "question": "Which medication is commonly used as a first-line treatment for type 2 diabetes?",
+        "options": [
+            "Metformin",
+            "Insulin",
+            "Sulfonylureas",
+            "DPP-4 inhibitors"
+        ],
+        "answer": "Metformin",
+        "explanation": "Metformin is recommended as first-line therapy due to its efficacy, safety profile, and benefits on weight and cardiovascular outcomes.",
+        "clinical_area": "Endocrinology",
+        "knowledge_category": "Usage",
+        "difficulty": "Easy",
+        "target_audience": "Pharmacists, Doctors",
+        "approved": true,
+        "statistics": {
+            "date_shown": "2025-03-18",
+            "total_responses": 0,
+            "correctly_answered": 0,
+            "total_answered": {
+                "Metformin": 0,
+                "Insulin": 0,
+                "Sulfonylureas": 0,
+                "DPP-4 inhibitors": 0
+            }
+        }
+    }
+]
