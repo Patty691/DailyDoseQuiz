@@ -111,7 +111,7 @@ def classify_medication(df, atc_clusters, atc_cluster_names):
         })
 
     # After populating the dictionary, calculate total statistics for the atc cluster (db = database)
-    totaal_verstrekkingen_db = sum(
+    totaal_verstrekkingen_dict = sum(
     med["verstrekkingen_huidig"] for cluster in atc_clusters.values() for med in cluster["geneesmiddelen"]
     ) 
     for atc5_code in atc_clusters:
@@ -129,7 +129,7 @@ def classify_medication(df, atc_clusters, atc_cluster_names):
             totaal_groei_percentage = ((totaal_verstrekkingen_huidig - totaal_verstrekkingen_vorig) / totaal_verstrekkingen_vorig) * 100
             totaal_groei_percentage = round(totaal_groei_percentage, 1)
 
-        totaal_percentage = (totaal_verstrekkingen_huidig / totaal_verstrekkingen_db) * 100
+        totaal_percentage = (totaal_verstrekkingen_huidig / totaal_verstrekkingen_dict) * 100
         totaal_percentage = round(totaal_percentage, 1)
 
         # add statistics to atc cluster

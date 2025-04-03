@@ -87,4 +87,27 @@ with open('/Users/pattynooijen/Documents/VisualStudioCode/daliy_dose_quiz/data/q
 
  
 
+ """
+suggestie van copilot
+
+def generate_quiz_question(atc7_code, geneesmiddel, merknaam, cluster):
+    
+    Generate a quiz question for a given medicine.
+
+    Args:
+        atc7_code (str): The ATC7 code of the medicine.
+        geneesmiddel (str): The name of the medicine.
+        merknaam (str): The brand name of the medicine.
+        cluster (str): The name of the ATC5 cluster.
+
+    Returns:
+        str: A generated quiz question.
+   
+        
+
+    return (
+        f"Wat is de juiste toepassing van het geneesmiddel {geneesmiddel} "
+        f"(merknaam: {merknaam}) uit de cluster {cluster} (ATC7-code: {atc7_code})?"
+    )"""
+
 

@@ -73,10 +73,10 @@ df = df[column_order]
 df.drop(columns=["ATC-code"], inplace=True, errors="ignore")
 
 
-# Classification of Medications
+# Classification of medicines
 
-def classify_medications(data):
-    #Classify medications at the atc level and nest ATC7 data.
+def classify_medicines(data):
+    #Classify medicines at the atc level and nest ATC7 data.
     classified_data = {}
     for entry in data:
         atc = entry["left 5 characters of atc7"]
@@ -85,34 +85,34 @@ def classify_medications(data):
         growth = entry.get("growth", 0)
 
         if atc not in classified_data:
-            classified_data[atc] = {"name": atc_CLUSTER_NAMES.get(atc, "Unknown"), "medications": []}
+            classified_data[atc] = {"name": atc_CLUSTER_NAMES.get(atc, "Unknown"), "medicines": []}
         
-        classified_data[atc]["medications"].append({"atc7": atc7, "usage": usage, "growth": growth})
+        classified_data[atc]["medicines"].append({"atc7": atc7, "usage": usage, "growth": growth})
     return classified_data
 
 # Step 4: Weighting at atc level
 def calculate_weights(classified_data):
-    #Calculate weights for top 500 and growth medications.
+    #Calculate weights for top 500 and growth medicines.
     weighted_data = {}
     for atc, data in classified_data.items():
-        total_usage = sum(med["usage"] for med in data["medications"])
-        growth_medications = [m for m in data["medications"] if m["growth"] > 0]
+        total_usage = sum(med["usage"] for med in data["medicines"])
+        growth_medicines = [m for m in data["medicines"] if m["growth"] > 0]
         
         weight_top500 = math.log(total_usage) if total_usage > 0 else 0
-        weight_growth = sum(math.log(m["usage"]) * m["growth"] for m in growth_medications if m["usage"] > 0)
+        weight_growth = sum(math.log(m["usage"]) * m["growth"] for m in growth_medicines if m["usage"] > 0)
         
         weighted_data[atc] = {
             "name": data["name"],
             "weight_top500": weight_top500,
             "weight_growth": weight_growth,
-            "medications": data["medications"]
+            "medicines": data["medicines"]
         }
     return weighted_data
 
 # Step 5: Weighting at ATC7 level
-def weight_atc7(medications):
+def weight_atc7(medicines):
    # Calculate weight for each ATC7 medication within its cluster.
-    for med in medications:
+    for med in medicines:
         med["weight"] = math.log(med["usage"]) if med["usage"] > 0 else 0
 
 # Step 6: Store the output in JSON
@@ -124,11 +124,11 @@ def save_to_json(data, filename="ATC_weighted_medication_usage.json"):
 # Main execution
 def main():
     data = load_gip_data()
-    classified_data = classify_medications(data)
+    classified_data = classify_medicines(data)
     weighted_data = calculate_weights(classified_data)
     
     for atc in weighted_data:
-        weight_atc7(weighted_data[atc]["medications"])
+        weight_atc7(weighted_data[atc]["medicines"])
     
     save_to_json(weighted_data)
     

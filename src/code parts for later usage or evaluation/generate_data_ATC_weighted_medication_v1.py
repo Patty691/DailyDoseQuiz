@@ -7,7 +7,7 @@ import json
 # with open("medication_data.json", "r") as f:
 #     medication_data = json.load(f)
 
-# Simulated dataset (GIP Top 500 & fastest-growing medications with ATC codes)
+# Simulated dataset (GIP Top 500 & fastest-growing medicines with ATC codes)
 medication_data = {
     "Metformin": {"usage": 500000, "growth": 0.05, "atc": "A10BA", "atc7": "A10BA02"},
     "Paracetamol": {"usage": 1000000, "growth": 0.02, "atc": "N02BE", "atc7": "N02BE01"},
@@ -50,11 +50,11 @@ for med, details in medication_data.items():
         atc_clusters[atc] = {
             "name": atc_names.get(atc, "Unknown group"),
             "total_usage": 0,
-            "medications": {}
+            "medicines": {}
         }
 
     atc_clusters[atc]["total_usage"] += usage
-    atc_clusters[atc]["medications"][atc7] = {
+    atc_clusters[atc]["medicines"][atc7] = {
         "name": atc7_names.get(atc7, "Unknown medication"),
         "usage": usage,
         "growth": growth
@@ -65,27 +65,27 @@ for atc, details in atc_clusters.items():
     details["weight"] = calculate_weight(details["total_usage"])
 
     # Step 4: Calculate weighted probabilities per ATC7 within each atc group
-    total_usage_atc = sum(med["usage"] for med in details["medications"].values())
+    total_usage_atc = sum(med["usage"] for med in details["medicines"].values())
 
-    for atc7, med_details in details["medications"].items():
+    for atc7, med_details in details["medicines"].items():
         med_usage = med_details["usage"]
         med_growth = med_details["growth"]
 
         atc7_weight = calculate_weight(med_usage, med_growth) / calculate_weight(total_usage_atc)
 
-        details["medications"][atc7]["weight"] = atc7_weight
+        details["medicines"][atc7]["weight"] = atc7_weight
 
 # Step 5: Export to JSON
 output_data = {
     atc: {
         "name": details["name"],
         "weight": details["weight"],
-        "medications": details["medications"]
+        "medicines": details["medicines"]
     }
     for atc, details in atc_clusters.items()
 }
 
-with open("atc_weighted_medications.json", "w") as f:
+with open("atc_weighted_medicines.json", "w") as f:
     json.dump(output_data, f, indent=4)
 
 # Debug: Print JSON output
@@ -99,7 +99,7 @@ example json output
     "A10BA": {
         "name": "Biguanides (e.g., Metformin)",
         "weight": 10.82,
-        "medications": {
+        "medicines": {
             "A10BA02": {
                 "name": "Metformin",
                 "usage": 500000,
@@ -111,7 +111,7 @@ example json output
     "N02BE": {
         "name": "Anilides (e.g., Paracetamol)",
         "weight": 13.81,
-        "medications": {
+        "medicines": {
             "N02BE01": {
                 "name": "Paracetamol",
                 "usage": 1000000,

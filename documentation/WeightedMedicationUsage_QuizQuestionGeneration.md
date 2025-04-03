@@ -4,16 +4,16 @@ A. Generating a Weighted Medication Usage List as a Source for Quiz Questions
 
 1. Load Data
 
-Load the top 500 medications and their growth rates during the previous year from the GIP database. Yearly updated in may.
+Load the top 500 medicines and their growth rates during the previous year from the GIP database. Yearly updated in may.
 
 2023:
 https://www.gipdatabank.nl/databank?infotype=g&label=00-totaal&tabel_d_00-totaal=B_01-basis&tabel_g_00-totaal=R_46_top500_atclaatst&tabel_h_00-totaal=B_01-basis&geg=vs&spec=&item=
 
 (geneesmiddelen, top 500, uitgiftes, geen specificatie)
 
-2. Classification of Medications
+2. Classification of medicines
 
-Medications are classified at the atc level.
+medicines are classified at the atc level.
 
 All ATC7 data is nested within its corresponding atc category.
 
@@ -23,11 +23,11 @@ The atc code is supplemented with the corresponding atc cluster name.
 
 The name is retrieved from a predefined dictionary.
 
-4. Weighting of Top 500 and Growth Medications at atc Level
+4. Weighting of Top 500 and Growth medicines at atc Level
 
 Percentages of usage. 
 
-Growth Medications: Medications with a high growth rate (% from second last to last year).
+Growth medicines: medicines with a high growth rate (% from second last to last year).
 
 
 5. Weighting at ATC7 Level Within a Cluster
@@ -47,11 +47,11 @@ B. Selection of a Medication for Quiz Question Generation
 
 80% of selections come from the usage percentage. 
 
-20% of selections come from Growth Medications.
+20% of selections come from Growth medicines.
 
 Intelligent Tracking & Variation Mechanism:
 
-Cooldown Mechanism: Reduces repetition of previously selected medications.
+Cooldown Mechanism: Reduces repetition of previously selected medicines.
 
 User Performance-Based Selection: Difficult topics appear more frequently if a user struggles with them.
 

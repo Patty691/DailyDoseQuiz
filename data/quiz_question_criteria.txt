@@ -44,4 +44,4 @@ Clinical Areas
 	5.	Renal Impairment – Patients with chronic kidney disease (CKD) or acute renal failure, requiring dose adjustments.
 	6.	Hepatic Impairment – Patients with liver disease, affecting drug metabolism and toxicity.
 	7.	Immunocompromised Patients – Includes HIV/AIDS, chemotherapy patients, organ transplant recipients, and other immune deficiencies.
-	8.	Obese Patients – Patients with high BMI, requiring adjusted dosing for certain medications.
+	8.	Obese Patients – Patients with high BMI, requiring adjusted dosing for certain medicines.
