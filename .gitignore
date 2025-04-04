@@ -1,0 +1,127 @@
+#Uitleg van belangrijke regels:
+#Python-specifieke bestanden:
+
+# __pycache__/ en *.py[cod] zorgen ervoor dat gecompileerde Python-bestanden worden genegeerd.
+# .venv/ en .env negeren virtuele omgevingen en configuratiebestanden.
+# Gevoelige bestanden:
+
+# *.key, *.pem, en .env zorgen ervoor dat gevoelige bestanden zoals API-sleutels en certificaten niet worden gecommit.
+# AI-gerelateerde bestanden:
+
+# *.model, *.h5, en andere extensies voor machine learning-modellen worden genegeerd.
+# IDE-specifieke bestanden:
+
+# .vscode/ en .idea/ negeren projectbestanden van populaire IDE's zoals Visual Studio Code en PyCharm.
+# Outputbestanden:
+
+# quiz_questions.json wordt genegeerd om te voorkomen dat gegenereerde quizvragen per ongeluk worden gecommit.
+
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+# Usually these files are written by a python script from a template
+# before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.coveragerc
+*.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Secrets and keys
+*.key
+*.pem
+*.crt
+*.pfx
+secrets.json
+config.json
+.env
+
+# AI-related files
+*.model
+*.h5
+*.ckpt
+*.onnx
+*.tflite
+*.pt
+*.pth
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.save
+*.~undo-tree~
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python-specific cache
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Ignore quiz question output
+quiz_questions.json
