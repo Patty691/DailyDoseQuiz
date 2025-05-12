@@ -3,7 +3,6 @@ import json
 import requests
 from bs4 import BeautifulSoup
 
-
 """
 This code generates a JSON file with medication clusters and their statistics.
 
@@ -166,7 +165,7 @@ if __name__ == "__main__":
         print(f"Fout bij het opslaan van JSON-bestand: {e}")
 
 
-"""
+""" 
 Example json output:
 
 {
@@ -233,3 +232,5 @@ Example json output:
 
 
 
+
+# %%

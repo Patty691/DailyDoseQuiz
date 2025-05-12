@@ -2,10 +2,12 @@ import random
 import json
 import os
 import pandas as pd  
+""""
 from QuizGenerator import generate_quiz_question  # Import de functie uit het andere bestand
-
+"""
 
 # to do:
+# select medicatie: random choice ipv unique 
 # Step 3: Generate Quiz Questions: schrijf eerst in een afzonderlijk bestand een functie die quizvragen genereert. Neem sample input hiervoor. 
 
 ## voeg de merknaam toe aan de output als dit nodig is voor apotheek.nl
@@ -25,8 +27,8 @@ Aantal clusters en gnm baseren op uiteindelijk gebruik:
 WEIGHT_PERCENTAGE = 0.99  # Weight for percentage_verstrekkingen
 WEIGHT_GROWTH = 0.01      # Weight for groei_percentage
 WEIGHT_NEW_IN_LIST = 2    # Weight multiplier for "nieuw in de lijst"
-NUM_CLUSTERS = 20         # Number of ATC5 clusters to select
-NUM_MEDICINES = 1         # Number of medicines to select per ATC5 cluster
+NUM_CLUSTERS = 10         # Number of ATC5 clusters to select
+NUM_MEDICINES = 3         # Number of medicines to select per ATC5 cluster
 
 def load_data(filename):
     try:
@@ -113,7 +115,7 @@ def weighted_selection_cluster(atc_clusters, num_clusters=NUM_CLUSTERS):
         choices.extend([atc5_code] * int(weight))
 
     # Randomly select unique ATC5 codes based on the weighted choices
-    selected_atc5 = weighted_selection_unique(choices, k=num_clusters) if choices else []    
+    selected_atc5 = random.choices(choices, k=num_clusters) if choices else []    
     return selected_atc5, weights_log
 
 def weighted_selection_medication(medicines, num_medicines=NUM_MEDICINES):
@@ -196,10 +198,13 @@ if __name__ == "__main__":
 
 """ 
 Verdeling van verantwoordelijkheden:
-In dit bestand (GenerateQuizQuestions.py):
+In dit bestand (SelectMedication.py):
 
 Beheer de selectie van ATC5-clusters en ATC7-medicatie.
 Roep de functie aan die quizvragen genereert.
+
+
+
 Zorg voor het opslaan van de gegenereerde quizvragen.
 In een afzonderlijk bestand (QuizGenerator.py):
 
