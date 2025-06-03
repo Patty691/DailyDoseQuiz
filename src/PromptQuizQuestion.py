@@ -78,6 +78,16 @@ class QuizPrompts:
         - mag de lezer op het verkeerde been zetten of misleiden, zolang de informatie maar correct is en bij de situatie past.
         - controleer na het schrijven van de introductie of deze geen informatie bevat die het juiste antwoord of de antwoordopties verraadt; herschrijf indien nodig.
         - fout voorbeeld: juist antwoord is astma, introductie benoemt dat een patient astma heeft (en niet de andere opties)
+        - Gebruik gevarieerde, realistische praktijksituaties. Voorbeelden:
+            * Een telefonische vraag van een bezorgde patiënt
+            * Een overleg met een huisarts of specialist
+            * Een vraag bij de eerste uitgifte
+            * Een medicatiebewakingssignaal dat opvolging vereist
+            * Een vraag tijdens een medicatie-verificatiegesprek
+        - Gebruik verschillende patiëntprofielen, en varieer de leeftijd. Bijvoorbeeld:
+            * Een man met meerdere aandoeningen
+            * Een zwangere vrouw in het eerste trimester
+            * Een patiënt met verminderde nierfunctie
     - De uitleg:
         - geeft relevante achtergrondinformatie (zoals farmacologische werking, klinische implicaties, uitzonderingen).
         - leg moeilijke termen uit, eventueel tussen haakjes.

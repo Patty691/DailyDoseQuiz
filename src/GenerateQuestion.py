@@ -4,12 +4,12 @@ import os
 import instructor
 import random
 import openai
-from pydantic import BaseModel, Field
 from openai import OpenAI
 from enum import Enum
 from typing import List
 from PromptQuizQuestion import QuizPrompts
 from GetMedicineInfo import get_medicine_info 
+from OutputModels import Response, Extraction
 
 
 # get_medicine_info is verwijderd uit dit bestand. check of het afzonderlijke bestand goed gebruikt wordt.
@@ -40,29 +40,6 @@ KNOWLEDGE_CATEGORIES = {
     "stoppen met gebruik": 1,
     "bijzondere populaties (bijv. ouderen, obesen, kinderen, zwangeren, borstvoeding)": 1,
 }
-
-class Extraction(BaseModel):
-    relevant_information: str = Field(description="The extracted information.")
-
-class Response(BaseModel):
-    class Step(BaseModel):
-        description: str = Field(description="Description of the step taken.")
-        action: str = Field(description="Action taken to resolve the issue.")
-        result: str = Field(description="Result of the action taken.")
-    steps: List[Step]
-
-    class FinalResolution(BaseModel):
-        introductie: str = Field(description="The introduction text for the quiz question.")
-        vraag: str = Field(description="The quiz question.")
-        antwoordopties: List[str] = Field(description="The answer options for the quiz question, without any prefixes.")
-        antwoord: str = Field(description="The correct answer to the quiz question.")
-        uitleg: str = Field(description="The explanation for the correct answer.")
-    final_resolution: FinalResolution
-
-class Config:
-        json_schema_extra = {
-        "required": ["steps", "final_resolution"]
-        }
 
                            
 # Define the initialize_openai_client function
