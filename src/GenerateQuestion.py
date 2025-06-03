@@ -41,7 +41,60 @@ KNOWLEDGE_CATEGORIES = {
     "bijzondere populaties (bijv. ouderen, obesen, kinderen, zwangeren, borstvoeding)": 1,
 }
 
-                           
+# Function to handle the complete question generation process
+def generate_quiz_question(medicine_name: str, medicine_info: str, debug_mode: bool = False) -> Response:
+    """
+    Handles the complete process of generating a quiz question:
+    1. Gets a random category
+    2. Extracts relevant information
+    3. Generates the quiz question
+    
+    Args:
+        medicine_name: Name of the medicine
+        medicine_info: Complete medicine information
+        debug_mode: Whether to print debug information
+        
+    Returns:
+        Response: The generated question with all its components
+    """
+    try:
+        # Initialize client
+        client = initialize_openai_client()
+        
+        # Get random category
+        random_category = get_random_knowledge_category()
+        if debug_mode:
+            print(f"\nGekozen kenniscategorie: {random_category}")
+            
+        # Extract relevant information
+        relevant_info = extract_relevant_info(client, medicine_info, random_category)
+        if debug_mode:
+            print("\nRelevante informatie:")
+            print(relevant_info)
+            
+        # Generate query
+        query = f"De vraag moet gaan over {medicine_name} en betrekking hebben op de categorie: {random_category}"
+        if debug_mode:
+            print(f"\nQuery: {query}")
+            
+        # Generate question using the same client
+        response = client.beta.chat.completions.parse(
+            model=MODEL, 
+            response_format=Response,
+            temperature=0.6,  # Adjust the temperature for creativity
+            messages=[
+                {"role": "system", "content": QuizPrompts.STYLE},
+                {"role": "system", "content": f"{QuizPrompts.ROLE}\nGebruik uitsluitend de volgende informatie: {relevant_info}."},
+                {"role": "system", "content": QuizPrompts.INSTRUCTIONS},
+                {"role": "user", "content": query}
+            ],  
+        )                  
+        return response.choices[0].message.parsed
+            
+    except Exception as e:
+        raise RuntimeError(f"Failed to generate complete quiz question: {e}")
+
+
 # Define the initialize_openai_client function
 def initialize_openai_client() -> instructor.Instructor:
     # Load environment variables from the .env file
@@ -83,74 +136,21 @@ def extract_relevant_info(client: openai, medicine_info: str, random_category: s
     # Retourneer de inhoud van de eerste keuze
     return response.choices[0].message.parsed
 
-# Function to generate a quiz question
-def generate_quiz_question(query: str, relevant_info: str, random_category: str) -> Response:
-    try:
-        # Create a chat completion request
-        response = client.beta.chat.completions.parse(
-            model=MODEL, 
-            response_format=Response,
-            temperature=0.6,  # Adjust the temperature for creativity
-            messages=[
-                {"role": "system", "content": QuizPrompts.STYLE},
-                {"role": "system", "content": f"{QuizPrompts.ROLE}\nGebruik uitsluitend de volgende informatie: {relevant_info}."},
-                {"role": "system", "content": QuizPrompts.INSTRUCTIONS},
-                {"role": "user", "content": query}
-            ],  
-        )                  
-        return response.choices[0].message.parsed
-
-    except Exception as e:
-        raise RuntimeError(f"Failed to generate quiz question: {e}")
-    
-
 # Main-functie
 if __name__ == "__main__":
     medicine_name = "aska"  # Vervang dit door de naam van het medicijn dat je wilt gebruiken
     atc_cluster = "geen"  # Vervang dit door de ATC-clusterNAAM die je wilt gebruiken 
     
-    DEBUG_MODE = False  # Zet op False om debug-informatie niet af te drukken
-    
-    client = initialize_openai_client()
+    DEBUG_MODE = True  # Zet op False om debug-informatie niet af te drukken
         
     try:
         medicine_info = get_medicine_info(medicine_name, atc_cluster)
         if not medicine_info or "No relevant information found" in medicine_info:
             print("Geen relevante medicatie-informatie gevonden. Kan geen quizvraag genereren.")
             exit(1)
-       # Print debug-informatie alleen als DEBUG_MODE True is
-        if DEBUG_MODE:
-            print("DEBUG: Opgehaalde medicatie-informatie:")
-            print(medicine_info)
-    except Exception as e:
-        print(f"Error fetching medicine information: {e}")
-        exit(1)
-
-    # Kies een willekeurige kenniscategorie
-    random_category = get_random_knowledge_category()
-    print(f"\n\n\nGekozen kenniscategorie: {random_category}\n\n")
-
-    # Haal relevante informatie op
-    try:
-        relevant_info = extract_relevant_info(client, medicine_info, random_category)
-        print("Relevante informatie:")
-        print(relevant_info)
-    except Exception as e:
-        print(f"Error extracting relevant information: {e}")
-        exit(1)
-
-    #Genereer een quizvraag
-    print("\nQuizvraag genereren...")
-    query = f"De vraag moet gaan over {medicine_name} en betrekking hebben op de categorie: {random_category}."    
-    print (f"\n\nQuery: {query}\n")
-    try:
-        response = generate_quiz_question(query, medicine_info, random_category)
-        # Print de stappen
-        for step in response.steps:
-            print(f"Step: {step.description}")
-            print(f"Action: {step.action}")
-            print(f"Result: {step.result}\n")
-
+            
+        response = generate_quiz_question(medicine_name, medicine_info, DEBUG_MODE)
+        
         # Print de final_resolution
         print("\nGegenereerde quizvraag:")
         print(f"\n\nIntroductie: {response.final_resolution.introductie}")

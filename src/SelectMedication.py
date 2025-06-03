@@ -9,8 +9,8 @@ from typing import Dict, Any, List, Tuple
 ## unit test en integratie test maken
 #   Hoe ziet de app eruit. tip: bij 3 vragen per dag 3 over zelfde cluster.
 
-NUM_CLUSTERS = 5       # Aantal ATC5 clusters om te selecteren
-NUM_MEDICINES = 2      # Aantal geneesmiddelen om te selecteren per cluster
+NUM_CLUSTERS = 2      # Aantal ATC5 clusters om te selecteren
+NUM_MEDICINES = 1     # Aantal geneesmiddelen om te selecteren per cluster
 
 def load_data(filename: str) -> dict[str, any]:
     """Laad de medicatie database met vooraf berekende gewichten."""
@@ -159,7 +159,7 @@ def select_medication(atc_cluster: str = None, num_clusters: int = 1, num_medici
     
     result = {
         "selected_clusters": [],
-        "selected_medications": []
+        "selected_geneesmiddelen": []
     }
     
     try:
@@ -177,9 +177,9 @@ def select_medication(atc_cluster: str = None, num_clusters: int = 1, num_medici
             cluster = atc_clusters[atc5_code]
             cluster_info = {
                 "atc5_code": atc5_code,
-                "name": cluster["naam"],
+                "naam": cluster["naam"],
                 "gewicht": cluster["statistiek"]["gewicht"],
-                "medications": []
+                "geneesmiddelen": []
             }
             
             # Selecteer medicijnen uit het cluster
@@ -188,16 +188,16 @@ def select_medication(atc_cluster: str = None, num_clusters: int = 1, num_medici
                 num_medicines
             )
             
-            # Voeg medicatie details toe
+            # Voeg geneesmiddel details toe
             for atc7 in selected_meds:
                 med_info = next(
                     med for med in cluster["geneesmiddelen"] 
                     if med["atc7"] == atc7
                 )
-                cluster_info["medications"].append({
+                cluster_info["geneesmiddelen"].append({
                     "atc7": med_info["atc7"],
-                    "name": med_info["geneesmiddel"],
-                    "brand": med_info.get("merknaam", ""),
+                    "naam": med_info["geneesmiddel"],
+                    "merknaam": med_info.get("merknaam", ""),
                     "gewicht": med_info["gewicht"]
                 })
             
@@ -218,15 +218,15 @@ if __name__ == "__main__":
     
     for cluster in result["selected_clusters"]:
         # Print cluster informatie
-        print(f"\nCluster: {cluster['name']} ({cluster['atc5_code']})")
+        print(f"\nCluster: {cluster['naam']} ({cluster['atc5_code']})")
         print(f"Cluster gewicht: {cluster['gewicht']:.1f}")
         
-        # Print medicaties in dit cluster
-        for med in cluster["medications"]:
-            print(f"\n  Geneesmiddel: {med['name']} ({med['atc7']})")
+        # Print geneesmiddelen in dit cluster
+        for med in cluster["geneesmiddelen"]:
+            print(f"\n  Geneesmiddel: {med['naam']} ({med['atc7']})")
             print(f"  Gewicht: {med['gewicht']:.1f}")
-            if med['brand']:
-                print(f"  Merknaam: {med['brand']}")
+            if med['merknaam']:
+                print(f"  Merknaam: {med['merknaam']}")
         
         print("-" * 70)
 
