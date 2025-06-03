@@ -2,6 +2,10 @@ import pandas as pd
 import json
 import requests
 from bs4 import BeautifulSoup
+from langchain.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+from typing import Dict, Any, List
+import os
 
 """
 This code generates a JSON file with medication clusters and their statistics.
@@ -10,6 +14,11 @@ WARNING: Before updating the CSV file (input), read the user manual in the READM
 
 For detailed instructions and context, also refer to the README.md file in the project root.
 """
+
+# Constants for weight calculation
+GEWICHT_PERCENTAGE = 0.99  # Weight for percentage_verstrekkingen
+GEWICHT_GROEI = 0.01      # Weight for groei_percentage
+GEWICHT_NIEUW = 2    # Weight multiplier for "nieuw in de lijst"
 
 def adjust_csv():
     df = pd.read_csv("/Users/pattynooijen/Documents/VisualStudioCode/daily_dose_quiz/data/gip_top_500_verstrekkingen_2023.csv")
@@ -27,7 +36,7 @@ def adjust_csv():
     return df 
 
  
-def get_atc_cluster_name(atc5_code):
+def get_atc_cluster_name(atc5_code: str) -> str:
     url = f"https://www.gipdatabank.nl/databank?infotype=g&label=00-totaal&tabel=B_01-basis&geg=gebr&item={atc5_code}"
 
     try:
@@ -53,7 +62,7 @@ def get_atc_cluster_name(atc5_code):
     except Exception as e:
         print(f"Error retrieving cluster name for ATC5 code {atc5_code}: {e}")
         return "onbekend"
-    
+
 def name_atc_clusters(df):
     atc_cluster_names = {}
 
@@ -142,12 +151,52 @@ def medication_statistics(atc_clusters):
             med["groei_percentage"] = round(groei_percentage, 1) if isinstance(groei_percentage, float) else groei_percentage
 
     return atc_clusters
- 
+
+def calculate_weights(atc_clusters):
+    """Calculate weights for both ATC5 clusters and individual medications."""
+    total_verstrekkingen = sum(
+        cluster["statistiek"]["totaal_verstrekkingen_huidig"] 
+        for cluster in atc_clusters.values()
+    )
+
+    # Calculate weights for each ATC5 cluster
+    for atc5_code, cluster in atc_clusters.items():
+        # Calculate cluster weight based on total verstrekkingen and growth
+        cluster_percentage = (cluster["statistiek"]["totaal_verstrekkingen_huidig"] / total_verstrekkingen) * 100
+        cluster_growth = cluster["statistiek"]["totaal_groeipercentage"]
+        
+        if isinstance(cluster_growth, str) and cluster_growth.lower() == "nieuw in de lijst":
+            # For new clusters, use a higher weight
+            cluster["statistiek"]["gewicht"] = round(cluster_percentage * GEWICHT_NIEUW, 3)
+        else:
+            # For existing clusters, use the weighted formula
+            cluster["statistiek"]["gewicht"] = round(
+                cluster_percentage * GEWICHT_PERCENTAGE +
+                cluster_growth * GEWICHT_GROEI,
+                3
+            )
+
+        # Calculate weights for individual medications within the cluster
+        for med in cluster["geneesmiddelen"]:
+            if isinstance(med["groei_percentage"], str) and med["groei_percentage"].lower() == "nieuw in de lijst":
+                # For new medications, use a higher weight
+                med["gewicht"] = round(med["percentage_verstrekkingen"] * GEWICHT_NIEUW, 3)
+            else:
+                # For existing medications, use the weighted formula
+                med["gewicht"] = round(
+                    med["percentage_verstrekkingen"] * GEWICHT_PERCENTAGE +
+                    med["groei_percentage"] * GEWICHT_GROEI,
+                    3
+                )
+
+    return atc_clusters
+
 def generate_medication_database(df, atc_cluster_names):
     atc_clusters = {}
     atc_clusters = create_clusters(df, atc_clusters, atc_cluster_names)
     atc_clusters = cluster_statistics(atc_clusters)
     atc_clusters = medication_statistics(atc_clusters)
+    atc_clusters = calculate_weights(atc_clusters)
     return atc_clusters
 
 if __name__ == "__main__":
@@ -179,7 +228,8 @@ Example json output:
         "verstrekkingen_huidig": 8094200,
         "verstrekkingen_vorig": 8046500,
         "percentage_verstrekkingen": 55.1,
-        "groei_percentage": 0.6
+        "groei_percentage": 0.6,
+        "gewicht": 54.6
       },
       {
         "atc7": "A02BC01",
@@ -188,7 +238,8 @@ Example json output:
         "verstrekkingen_huidig": 5280000,
         "verstrekkingen_vorig": 5583800,
         "percentage_verstrekkingen": 35.9,
-        "groei_percentage": -5.4
+        "groei_percentage": -5.4,
+        "gewicht": 35.3
       },
       {
         "atc7": "A02BC05",
@@ -197,7 +248,8 @@ Example json output:
         "verstrekkingen_huidig": 1111100,
         "verstrekkingen_vorig": 1131700,
         "percentage_verstrekkingen": 7.6,
-        "groei_percentage": -1.8
+        "groei_percentage": -1.8,
+        "gewicht": 7.5
       },
       {
         "atc7": "A02BC04",
@@ -206,7 +258,8 @@ Example json output:
         "verstrekkingen_huidig": 144990,
         "verstrekkingen_vorig": 147770,
         "percentage_verstrekkingen": 1.0,
-        "groei_percentage": -1.9
+        "groei_percentage": -1.9,
+        "gewicht": 1.0
       },
       {
         "atc7": "A02BC03",
@@ -215,7 +268,8 @@ Example json output:
         "verstrekkingen_huidig": 58485,
         "verstrekkingen_vorig": 60689,
         "percentage_verstrekkingen": 0.4,
-        "groei_percentage": -3.6
+        "groei_percentage": -3.6,
+        "gewicht": 0.4
       }
     ],
     "statistiek": {
@@ -223,10 +277,11 @@ Example json output:
       "totaal_verstrekkingen_huidig": 14688775,
       "totaal_verstrekkingen_vorig": 14970459,
       "totaal_percentage_verstrekkingen": 7.4,
-      "totaal_groeipercentage": -1.9
+      "totaal_groeipercentage": -1.9,
+      "gewicht": 7.3
     }
   }
-
+}
 """
 
 
