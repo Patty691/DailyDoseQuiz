@@ -12,30 +12,8 @@ from bs4 import BeautifulSoup
 from typing import List
 
 # to do:
-## grootste knelpunt: de introductie verraadt het antwoord regelmatig, ondanks dat in de prompt staat dat dit niet mag. 
 
-## evaluatiefunctie is nog niet goed en voegt nog weinig toe. vooralsnog niet gebruiken (nice to have)
-    ## o.a. betrouwbaarheid van de quizvraag geeft nog onvoldoende informatie
-    ## feedback aan de quiz-generator llm voeden?
-    ## of uit code halen en elders opslaan voor later gebruik. incl. main functiedeel
-
-## fetch info: in afzonderlijk bestand zetten. en informatie ophalen in een functie.
-#     medicine_info = get_medicine_info(medicine_name, atc_cluster) vervangen door medicine_info =  .... ander bestand gaan draaien .... 
-
-# check of alle uitzonderingen en errors goed staan en begrijpelijk zijn (ook uit welk stuk code ze vandaan komen) en of er geen dubbelingen zijn met de main_functie
-
-
-# wordt de code te lang? opslitsen in afzonderelijke bestanden om informatie te krijgen (webscraping) en categorie te kiezen en daarna om de quizvraag te genereren.
-
-"""	•	300–1000 regels: dit begint groot te worden. Overweeg te splitsen als:
-	•	functies/clusters herbruikbaar zijn,
-	•	logica sterk gescheiden is (bijv. scraping vs. data-analyse).
-	•	> 1000 regels: meestal onoverzichtelijk. Dan moet je gaan splitsen."""
-
-#laatste stap:
-#in de main functie veel try-except, en in de code blokken. is dat niet dubbel?
-#schoon de code op. maak een readme (of update de bestaande readme). maak tests (unit en integratie)
-
+#zie 2LLMs functioneel.py
 
 
 """ 
@@ -74,25 +52,27 @@ class Response(BaseModel):
         result: str = Field(description="Result of the action taken.")
     steps: List[Step]
 
+    class SelfVerification(BaseModel):
+        check_accuracy: str = Field(description="Verification of medical/pharmaceutical accuracy")
+        check_clarity: str = Field(description="Verification that the question and options are clear and unambiguous")
+        check_fairness: str = Field(description="Verification that the question tests knowledge fairly")
+        improvements: List[str] = Field(description="List of improvements made during verification")
+
     class FinalResolution(BaseModel):
         introductie: str = Field(description="The introduction text for the quiz question.")
         vraag: str = Field(description="The quiz question.")
         antwoordopties: List[str] = Field(description="The answer options for the quiz question, without any prefixes.")
         antwoord: str = Field(description="The correct answer to the quiz question.")
         uitleg: str = Field(description="The explanation for the correct answer.")
+        verificatie: "Response.SelfVerification" = Field(description="Self-verification results")
+
     final_resolution: FinalResolution
 
-class Config:
+    class Config:
         json_schema_extra = {
-        "required": ["steps", "final_resolution"]
+            "required": ["steps", "final_resolution"]
         }
 
-class Evaluation(BaseModel):
-    is_consistent: bool = Field(description="Whether the response is consistent with the source information")
-    feedback: str = Field(description="Detailed feedback about the quiz question, correctness, the style and difficulty")
-    improvement_suggestions: List[str] = Field(description="List of suggested improvements")
-    score: float = Field(description="Overall quality score (0-1)", ge=0, le=1)      
-                           
 
 def initialize_openai_client() -> instructor.Instructor:
     load_dotenv()
@@ -156,25 +136,98 @@ def get_random_knowledge_category() -> str:
     return random.choice(KNOWLEDGE_CATEGORIES)
 
 # Functie om relevante informatie te extraheren met een LLM
-def extract_relevant_info(client: openai, medicine_info: str, random_category: str) -> str:
-    prompt = f"""
-    Hier is informatie over een medicijn:  {medicine_info}
-    Geef de informatie die specifiek betrekking heeft op de categorie '{random_category}'.
+def extract_relevant_info(medicine_info: str, category: str) -> str:
     """
-    # Maak een chat completion request
-    response = client.beta.chat.completions.parse(
-        model=MODEL,
-        response_format=Extraction,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.1  # Pas de temperatuur naar beneden aan voor minder creatieve, meer feitelijke antwoorden
-    )
+    Extract information relevant to a specific category using headers and/or keywords.
+    Some information is found under specific headers, other information needs keyword search,
+    and some needs both.
     
-    # Controleer of de respons een 'choices'-attribuut bevat
-    if not hasattr(response, "choices"):
-        raise RuntimeError("De respons bevat geen 'choices'-attribuut. Controleer de API-aanroep.")
+    Args:
+        medicine_info (str): The full medicine information text
+        category (str): The category to extract information for
     
-    # Retourneer de inhoud van de eerste keuze
-    return response.choices[0].message.parsed
+    Returns:
+        str: The extracted relevant information
+    """
+    # Map categories to their search criteria
+    category_mapping = {
+        "indicaties": {
+            "headers": ["Wat doet"]
+        },
+        "werkingsmechanisme": {
+            "headers": ["Wat doet"],
+            "keywords": ["werkt door", "zorgt ervoor", "werking", "effect op"]
+        },
+        "dosering": {
+            "keywords": ["keer per dag", "tablet", "mg", "dosis", "innemen", "gebruiken"]
+        },
+        "toediening": {
+            "headers": ["Hoe gebruik ik"]
+        },
+        "interacties": {
+            "headers": ["Mag ik", "met andere medicijnen gebruiken"],
+            "keywords": ["combinatie met", "samen met", "wisselwerking"]
+        },
+        "contra-indicaties": {
+            "headers": ["met andere medicijnen gebruiken"], #onjuist, aanpassen
+            "keywords": []
+        },
+        "bijwerkingen": {
+            "headers": ["Wat zijn mogelijke bijwerkingen"]
+        },
+        "monitoring": {
+            "headers": ["Belangrijk om te weten"],
+            "keywords": ["controleren", "meten", "in de gaten houden", "bloeddruk", "hartslag"]
+        },
+        "rijvaardigheid": {
+            "headers": ["Kan ik met dit medicijn autorijden"]
+        },
+        "stoppen met gebruik": {
+            "headers": ["Mag ik zomaar"]
+        },
+        "bijzondere populaties": {
+            "headers": [
+                "Mag ik dit medicijn gebruiken als ik zwanger ben",
+                "bij ouderen",
+                "bij kinderen"
+            ],
+            "keywords": ["zwanger", "borstvoeding", "ouderen", "kinderen", "verminderde nierfunctie", "leverfunctie"]
+        }
+    }
+    
+    # Get mapping for the requested category
+    category_info = category_mapping.get(category.lower())
+    if not category_info:
+        return f"Geen specifieke informatie gevonden voor {category}."
+    
+    # Split into sections
+    sections = medicine_info.split("\n\n")
+    relevant_sections = []
+    
+    for i, section in enumerate(sections):
+        section_lower = section.lower()
+        is_relevant = False
+        
+        # Check headers if present
+        if "headers" in category_info:
+            if any(header.lower() in section_lower for header in category_info["headers"]):
+                is_relevant = True
+                # Add this section and the next one (which usually contains the content)
+                relevant_sections.append(section)
+                if i + 1 < len(sections):
+                    relevant_sections.append(sections[i + 1])
+                
+        # Check keywords if present
+        if "keywords" in category_info and not is_relevant:
+            if any(keyword.lower() in section_lower for keyword in category_info["keywords"]):
+                relevant_sections.append(section)
+    
+    # If no relevant sections found, return a message
+    if not relevant_sections:
+        return f"Geen specifieke informatie gevonden over {category}."
+    
+    # Join all relevant sections
+    return "\n\n".join(relevant_sections)
 
 # Function to generate a quiz question
 def generate_quiz_question(query: str, relevant_info: str, random_category: str) -> Response:
@@ -184,10 +237,55 @@ def generate_quiz_question(query: str, relevant_info: str, random_category: str)
     - gebruik toegankelijke, maar vakinhoudelijke taal.
     - benoem niet wat of waarom iets belangrijk is.
     - geen formulering zoals 'stel dat'.
+    - volg deze stappen bij het maken van antwoordopties:
+        1. Identificeer eerst het kernprincipe of de kernkennis die getest wordt
+        2. Schrijf het juiste antwoord op basis van de broninformatie
+        3. Creëer foute antwoorden door:
+           - Een klein maar cruciaal detail te veranderen
+           - Een veelvoorkomende misvatting te gebruiken
+           - Een logische maar incorrecte redenering te volgen
+        4. Controleer of alle opties:
+           - Dezelfde lengte en detail hebben
+           - Dezelfde grammaticale structuur hebben
+           - Even plausibel klinken
     """ 
 
     role = f"""
-    Je bent een zeer goede docent en wint prjzen voor het stellen van goede quizvragen en bijbehorende antwoordopties, introductie en uitleg. Maak een moeilijke, praktijkgerichte quizvraag voor zeer ervaren apothekersassistenten (bachelorniveau).
+    Je bent een zeer goede docent en wint prijzen voor het stellen van goede quizvragen en bijbehorende antwoordopties, introductie en uitleg. Maak een moeilijke, praktijkgerichte quizvraag voor zeer ervaren apothekersassistenten (bachelorniveau).
+    
+    Volg deze stappen:
+    1. Analyseer de informatie en kies een geschikt onderwerp
+    2. Maak een eerste versie van de vraag
+    3. Voer een kritische zelfcontrole uit en documenteer:
+        - Accuraatheid: Controleer of alle medische/farmaceutische informatie correct is
+        - Helderheid: Controleer of de vraag en antwoordopties duidelijk en ondubbelzinnig zijn
+        - Eerlijkheid: Controleer of de vraag op een eerlijke manier kennis test
+        - Verbeteringen: Documenteer welke verbeteringen je hebt aangebracht
+    4. Neem de resultaten van de zelfcontrole op in je antwoord
+    
+    Je bent expert in het maken van antwoordopties die:
+    - Allemaal even lang en gedetailleerd zijn
+    - Allemaal dezelfde grammaticale structuur hebben
+    - Allemaal plausibel klinken voor iemand die het niet helemaal zeker weet
+    - Subtiele maar cruciale verschillen bevatten die alleen iemand met diepgaande kennis kan herkennen
+    
+    Belangrijke regels voor medische accuraatheid:
+    - Vermijd oversimplificatie van farmacotherapeutische informatie
+    - Maak onderscheid tussen verschillende gradaties (bijv. absoluut vs. relatief, ernstig vs. mild)
+    - Benoem relevante nuances zoals:
+        * Dosisafhankelijkheid
+        * Receptorselectiviteit
+        * Tijdsafhankelijkheid
+        * Patiëntkenmerken
+        * Comedicatie
+    - Gebruik genuanceerde formuleringen wanneer er uitzonderingen mogelijk zijn:
+        * 'meestal', 'vaak', 'soms', 'kan'
+        * 'onder bepaalde voorwaarden'
+        * 'afhankelijk van'
+    - Vermijd absolute uitspraken tenzij het echt om absolute situaties gaat
+    - Als er voorwaarden of beperkingen zijn, specificeer deze dan
+    - Plaats informatie in de juiste context (bijv. ernst van de situatie, beschikbaarheid alternatieven)
+    
     Gebruik uitsluitend de volgende informatie: {relevant_info}. 
     """
 
@@ -198,14 +296,30 @@ def generate_quiz_question(query: str, relevant_info: str, random_category: str)
     - Foute antwoordopties zijn qua formulering en onderwerp vergelijkbaar met het juiste antwoord, zodat ze niet direct opvallen als fout.
     - Vermijd antwoordopties die duidelijk onjuist zijn of het juiste antwoord te makkelijk maken.
     - Het juiste antwoord is correct volgens de broninformatie en de foute antwoorden zijn zeker fout.
+
+    Goed voorbeeld van een genuanceerde vraag:
+    Introductie: Een 67-jarige patiënt met matige COPD en atriumfibrilleren heeft een bètablokker nodig. 
     
+    Vraag: Welke uitspraak over het voorschrijven van metoprolol bij deze patiënt is correct?
+    Antwoordopties:
+    Metoprolol is absoluut gecontra-indiceerd vanwege de COPD
+    Metoprolol kan worden voorgeschreven, startend met een lage dosis 
+    Metoprolol kan alleen worden voorgeschreven als de COPD eerst volledig onder controle is
+    Metoprolol kan alleen worden voorgeschreven in combinatie met een luchtwegverwijdering
+    
+    Antwoord: Metoprolol kan worden voorgeschreven, startend met een lage dosis onder controle
+    
+    Uitleg: Hoewel COPD een relatieve contra-indicatie is voor metoprolol, kan deze cardioselectieve bètablokker vaak veilig worden gebruikt bij COPD-patiënten. De cardioselectiviteit betekent dat het medicijn vooral effect heeft op β1-receptoren in het hart en minder op β2-receptoren in de luchtwegen. Door te starten met een lage dosis en de patiënt goed te monitoren, kunnen de voordelen voor de behandeling van atriumfibrilleren vaak opwegen tegen de mogelijke risico's voor de luchtwegen.
+
     Fout voorbeeld: 
+    Introductie: Een patient met angina pectoris krijgt een nieuw geneesmiddel. 
     Vraag: Bij welke van de volgende aandoeningen is metoprolol een geschikte behandeling?
     Antwoordopties: A) Hartfalen B) Astma C) Diabetes D) Angina pectoris
     Antwoord: Angina pectoris
     Fout omdat: 
     1. angina pectoris al in de introductie staat en het antwoord dus makkelijk te raden is.
     2. hartfalen ook een indicatie is voor metoprolol.
+    3. astma en diabetes heel andere aandoeningen zijn, waardoor het antwoord makkelijk te raden is.
     
     Introductie en uitleg:
     - zijn elk 3 tot 10 zinnen.
@@ -234,62 +348,34 @@ def generate_quiz_question(query: str, relevant_info: str, random_category: str)
                 {"role": "user", "content": query}
             ],  
         )                  
-        return response.choices[0].message.parsed
+
+        # Get the parsed response from the first choice
+        parsed_response = response.choices[0].message.parsed
+
+        # Print verification results if in debug mode
+        if DEBUG_MODE:
+            print("\nZelf-verificatie resultaten:")
+            verificatie = parsed_response.final_resolution.verificatie
+            print(f"Accuraatheid: {verificatie.check_accuracy}")
+            print(f"Helderheid: {verificatie.check_clarity}")
+            print(f"Eerlijkheid: {verificatie.check_fairness}")
+            if verificatie.improvements:
+                print("\nAangebrachte verbeteringen:")
+                for improvement in verificatie.improvements:
+                    print(f"- {improvement}")
+            print()
+            
+        return parsed_response
 
     except Exception as e:
         raise RuntimeError(f"Failed to generate quiz question: {e}")
     
-def evaluation(client: OpenAI, response: Response, relevant_info: str) -> Evaluation:
-    try:
-        evaluation_prompt = f"""
-        Evalueer deze quizvraag op basis van de originele informatie en retourneer je evaluatie in het volgende JSON-formaat:
-        {{
-            "is_consistent": true of false,
-            "feedback": "string met gedetailleerde feedback",
-            "improvement_suggestions": ["suggestie 1", "suggestie 2"],
-            "score": een getal tussen 0 en 1
-        }}
-
-        ORIGINELE INFORMATIE:
-        {relevant_info}
-
-        GEGENEREERDE QUIZ:
-        Introductie: {response.final_resolution.introductie}
-        Vraag: {response.final_resolution.vraag}
-        Antwoordopties: {response.final_resolution.antwoordopties}
-        Antwoord: {response.final_resolution.antwoord}
-        Uitleg: {response.final_resolution.uitleg}
-    
-        Controleer en beoordeel de volgende aspecten:
-        1. Inhoudelijke correctheid en consistentie met de broninfo
-        2. Niveau (bachelor-niveau apothekersassistent)
-        3. Praktijkgerichtheid
-        4. Kwaliteit van de antwoordopties
-        5. Kwaliteit van de introductie en uitleg
-        6. Of de vraag en antwoord logisch zijn voor deze casus en of ze aansluiten bij de praktijk
-        """
-
-        result = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": "Je bent een expert in het evalueren van quizvragen. Geef je evaluatie altijd in correct JSON-formaat."},
-                {"role": "user", "content": evaluation_prompt}
-            ],
-            response_model=Evaluation,
-            temperature=0.2
-        )
-        return result
-
-    except Exception as e:
-        raise RuntimeError(f"Error during response evaluation: {str(e)}")
-
 # Main-functie
 if __name__ == "__main__":
     client = initialize_openai_client()
    
-    medicine_name = "asa"  # Vervang dit door de naam van het medicijn dat je wilt gebruiken
-    atc_cluster = "antistolling"  # Vervang dit door de ATC-clusterNAAM die je wilt gebruiken 
-
+    medicine_name = "metoprolol"  # Vervang dit door de naam van het medicijn dat je wilt gebruiken
+    atc_cluster = "beta-blokkers"  # Vervang dit door de ATC-clusterNAAM die je wilt gebruiken 
 
     DEBUG_MODE = False  # Zet op False om debug-informatie niet af te drukken
     EVALUATION_MODE = False #zet op True om de evaluatie uit te voeren
@@ -297,7 +383,7 @@ if __name__ == "__main__":
     #Haal medicatie-informatie op
     try:
         medicine_info = get_medicine_info(medicine_name, atc_cluster)
-        if not medicine_info or "No relevant information found" in medicine_info: #waarom het deel na or? doet dit ook iets anders als er geen error is?
+        if not medicine_info or "No relevant information found" in medicine_info:
             print("Geen medicatie-informatie gevonden in de functie 'get_medicine_info'. Kan geen quizvraag genereren.")
             exit(1)
        # Print debug-informatie alleen als DEBUG_MODE True is
@@ -310,12 +396,12 @@ if __name__ == "__main__":
 
     # Kies een willekeurige kenniscategorie
     random_category = get_random_knowledge_category()
-    print(f"\n\n\nGekozen kenniscategorie: {random_category}\n\n")          ##waarom hier geen try-except?
+    print(f"\n\n\nGekozen kenniscategorie: {random_category}\n\n")
 
     # Extraheer relevante informatie 
     try:
-        relevant_info = extract_relevant_info(client, medicine_info, random_category)
-        print("DEBUG: Relevante informatie:")
+        relevant_info = extract_relevant_info(medicine_info, random_category)
+        print("Relevante informatie:")
         print(relevant_info)
     except Exception as e:
         print(f"Error extracting relevant information: {e}")
@@ -345,23 +431,5 @@ if __name__ == "__main__":
 
     except Exception as e:
         print(f"Error: {e}")
-    
-    #check the quality of the response
-    if EVALUATION_MODE:
-        print("\n\nEvaluatie van de quizvraag...")
-        try:
-            evaluation = evaluation(client, response, relevant_info)
-            
-            print("\nEvaluatie resultaten:")
-            print(f"Consistentie: {'Ja' if evaluation.is_consistent else 'Nee'}")
-            print(f"Score: {evaluation.score:.2f}")
-            print("\nFeedback:")
-            print(evaluation.feedback)
-            print("\nVerbeterpunten:")
-            for suggestion in evaluation.improvement_suggestions:
-                print(f"- {suggestion}")
-                
-        except Exception as e:
-            print(f"Error tijdens evaluatie: {e}")
 
 # %%

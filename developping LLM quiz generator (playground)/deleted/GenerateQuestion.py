@@ -10,16 +10,9 @@ from enum import Enum
 import requests
 from bs4 import BeautifulSoup
 from typing import List
+from PromptQuizQuestion import QuizPrompts
+from GetMedicineInfo import fetch_medicine_info
 
-# to do:
-## grootste knelpunt: de introductie verraad het antwoord
-
-
-## betrouwbaarheid van de quizvraag geeft nog onvoldoende informatie
-## evaluatiefunctie is nog niet goed
-## fetch info: optie om over te slaan als je niet de juiste URL kunt invoeren (of geen URL wilt geven)
-
-## later: moeilijkheidsgraad toevoegen in output?
 
 """ 
 Keuze van de modellen: 
@@ -31,7 +24,6 @@ max_retries wordt niet ondersteund in  response= client.beta.chat.completions.pa
 """
 
 MODEL = "gpt-4o-mini"  
-CLIENT = initialize_openai_client()
 
 KNOWLEDGE_CATEGORIES = {
     "indicaties": 4,
@@ -70,11 +62,6 @@ class Config:
         "required": ["steps", "final_resolution"]
         }
 
-class Evaluation(BaseModel):
-    is_consistent: bool = Field(description="Whether the response is consistent with the source information")
-    feedback: str = Field(description="Detailed feedback about the quiz question, correctness, the style and difficulty")
-    improvement_suggestions: List[str] = Field(description="List of suggested improvements")
-    score: float = Field(description="Overall quality score (0-1)", ge=0, le=1)      
                            
 # Define the initialize_openai_client function
 def initialize_openai_client() -> instructor.Instructor:
@@ -84,20 +71,39 @@ def initialize_openai_client() -> instructor.Instructor:
     # Get the OpenAI API key from the environment
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
+    # Debug information
+    print("Checking OpenAI API key configuration...")
+    if openai_api_key:
+        print("API key found in environment variables")
+    else:
+        print("API key not found in environment variables")
+        # Try to load from .env file directly
+        try:
+            with open('.env', 'r') as env_file:
+                print("Contents of .env file:")
+                print(env_file.read())
+        except FileNotFoundError:
+            print(".env file not found in current directory")
+        except Exception as e:
+            print(f"Error reading .env file: {e}")
+
     if not openai_api_key:
         raise ValueError("OpenAI API key not found. Please set it in the .env file.")
 
-    return instructor.from_openai(OpenAI())
+    # Initialize the OpenAI client
+    try:
+        client = OpenAI(api_key=openai_api_key)
+        return instructor.from_openai(client)
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize OpenAI client: {e}")
 
 
 # Function to fetch medicine information from www.apotheek.nl
 def fetch_medicine_info(medicine_name: str, atc_cluster: str) -> str:
     try:
-        # Probeer standaard URL
         base_url = f"https://www.apotheek.nl/medicijnen/{medicine_name.lower()}"
         response = requests.get(base_url)
 
-        # Als de standaard URL niet werkt, vraag handmatig om een juiste URL
         if response.status_code != 200:
             print(f"Kon URL voor {medicine_name} niet vinden.")
             full_url = input(f"Plak de exacte URL voor '{medicine_name}' uit ATC-cluster {atc_cluster}:\n> ")
@@ -131,32 +137,25 @@ def fetch_medicine_info(medicine_name: str, atc_cluster: str) -> str:
 
         except Exception as e:
             raise RuntimeError(f"Fout bij verwerken van HTML-pagina: {e}")
-        
+                  
 # Function to get a random knowledge category
 def get_random_knowledge_category() -> str:
     categories = list(KNOWLEDGE_CATEGORIES.keys())
     weights = list(KNOWLEDGE_CATEGORIES.values())
     return random.choices(categories, weights=weights, k=1)[0]
-    """
-    Kies willekeurig een kenniscategorie uit de lijst KNOWLEDGE_CATEGORIES.
 
-    Returns:
-        str: Een willekeurige kenniscategorie.
-    """
-    return random.choice(KNOWLEDGE_CATEGORIES)
 
 # Functie om relevante informatie te extraheren met een LLM
 def extract_relevant_info(client: openai, medicine_info: str, random_category: str) -> str:
-    prompt = f"""
-    Hier is informatie over een medicijn:  {medicine_info}
-    Geef de informatie die specifiek betrekking heeft op de categorie '{random_category}'.
-    """
+    # Use the extraction prompt from QuizPrompts
+    prompt = QuizPrompts.get_extraction_prompt(medicine_info, random_category)
+    
     # Maak een chat completion request
     response = client.beta.chat.completions.parse(
         model=MODEL,
         response_format=Extraction,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.1  # Pas de temperatuur naar beneden aan voor minder creatieve, meer feitelijke antwoorden
+        temperature=0.3  # Pas de temperatuur naar beneden aan voor minder creatieve, meer feitelijke antwoorden
     )
     
     # Controleer of de respons een 'choices'-attribuut bevat
@@ -168,49 +167,6 @@ def extract_relevant_info(client: openai, medicine_info: str, random_category: s
 
 # Function to generate a quiz question
 def generate_quiz_question(query: str, relevant_info: str, random_category: str) -> Response:
-    style = """
-    - je schrijft in het Nederlands, de je-vorm en zonder namen te noemen
-    - richt je impliciet tot de apothekersassistent (noem het woord apothekersassistent niet).
-    - gebruik toegankelijke, maar vakinhoudelijke taal.
-    - benoem niet wat of waarom iets belangrijk is.
-    - geen formulering zoals 'stel dat'.
-    """ 
-
-    role = f"""
-    Je bent een zeer goede docent en wint prjzen voor het stellen van goede quizvragen en bijbehorende antwoordopties, introductie en uitleg. Maak een moeilijke, praktijkgerichte quizvraag voor zeer ervaren apothekersassistenten (bachelorniveau).
-    Gebruik uitsluitend de volgende informatie: {relevant_info}. 
-    """
-
-    instructions = """ 
-    Antwoordopties:
-    - Antwoordopties zijn uitdagend en lijken sterk op elkaar, zodat het niet eenvoudig is het juiste antwoord te herkennen.
-    - Foute antwoordopties zijn inhoudelijk geloofwaardig, sluiten aan bij de context, en bevatten subtiele fouten of veelvoorkomende misvattingen.
-    - Foute antwoordopties zijn qua formulering en onderwerp vergelijkbaar met het juiste antwoord, zodat ze niet direct opvallen als fout.
-    - Vermijd antwoordopties die duidelijk onjuist zijn of het juiste antwoord te makkelijk maken.
-    - Het juiste antwoord is correct volgens de broninformatie en de foute antwoorden zijn zeker fout.
-    
-    Fout voorbeeld: 
-    Vraag: Bij welke van de volgende aandoeningen is metoprolol een geschikte behandeling?
-    Antwoordopties: A) Hartfalen B) Astma C) Diabetes D) Angina pectoris
-    Antwoord: Angina pectoris
-    Fout omdat: 
-    1. angina pectoris al in de introductie staat en het antwoord dus makkelijk te raden is.
-    2. hartfalen ook een indicatie is voor metoprolol.
-    
-    Introductie en uitleg:
-    - zijn elk 3 tot 10 zinnen.
-    - De introductie moet 100% voldoen aan de volgende eisen:
-        - vermijd dat de introductie het raden van het juiste antwoord vergemakkelijkt.
-        - beschrijft een realistische praktijksituatie van een patiënt.
-        - mag de lezer op het verkeerde been zetten of misleiden, zolang de informatie maar correct is en bij de situatie past.
-        - controleer na het schrijven van de introductie of deze geen informatie bevat die het juiste antwoord of de antwoordopties verraadt; herschrijf indien nodig.
-        - fout voorbeeld: juist antwoord is astma, introductie benoemt dat een patient astma heeft (en niet de andere opties)
-    - De uitleg:
-        - geeft relevante achtergrondinformatie (zoals farmacologische werking, klinische implicaties, uitzonderingen).
-        - leg moeilijke termen uit, eventueel tussen haakjes.
-        - kom terug op de informatie in de introductie, om de relevantie uit te leggen.
-    """ 
-
     try:
         # Create a chat completion request
         response = client.beta.chat.completions.parse(
@@ -218,9 +174,9 @@ def generate_quiz_question(query: str, relevant_info: str, random_category: str)
             response_format=Response,
             temperature=0.1,  # Adjust the temperature for creativity
             messages=[
-                {"role": "system", "content": style},
-                {"role": "system", "content": role},
-                {"role": "system", "content": instructions},
+                {"role": "system", "content": QuizPrompts.STYLE},
+                {"role": "system", "content": f"{QuizPrompts.ROLE}\nGebruik uitsluitend de volgende informatie: {relevant_info}."},
+                {"role": "system", "content": QuizPrompts.INSTRUCTIONS},
                 {"role": "user", "content": query}
             ],  
         )                  
@@ -229,59 +185,23 @@ def generate_quiz_question(query: str, relevant_info: str, random_category: str)
     except Exception as e:
         raise RuntimeError(f"Failed to generate quiz question: {e}")
     
-def evaluation(client: OpenAI, response: Response, relevant_info: str) -> Evaluation:
-    try:
-        evaluation_prompt = f"""
-        Evalueer deze quizvraag op basis van de originele informatie en retourneer je evaluatie in het volgende JSON-formaat:
-        {{
-            "is_consistent": true of false,
-            "feedback": "string met gedetailleerde feedback",
-            "improvement_suggestions": ["suggestie 1", "suggestie 2"],
-            "score": een getal tussen 0 en 1
-        }}
-
-        ORIGINELE INFORMATIE:
-        {relevant_info}
-
-        GEGENEREERDE QUIZ:
-        Introductie: {response.final_resolution.introductie}
-        Vraag: {response.final_resolution.vraag}
-        Antwoordopties: {response.final_resolution.antwoordopties}
-        Antwoord: {response.final_resolution.antwoord}
-        Uitleg: {response.final_resolution.uitleg}
-    
-        Controleer en beoordeel de volgende aspecten:
-        1. Inhoudelijke correctheid en consistentie met de broninfo
-        2. Niveau (bachelor-niveau apothekersassistent)
-        3. Praktijkgerichtheid
-        4. Kwaliteit van de antwoordopties
-        5. Kwaliteit van de introductie en uitleg
-        6. Of de vraag en antwoord logisch zijn voor deze casus en of ze aansluiten bij de praktijk
-        """
-
-        result = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": "Je bent een expert in het evalueren van quizvragen. Geef je evaluatie altijd in correct JSON-formaat."},
-                {"role": "user", "content": evaluation_prompt}
-            ],
-            response_model=Evaluation,
-            temperature=0.2
-        )
-        return result
-
-    except Exception as e:
-        raise RuntimeError(f"Error during response evaluation: {str(e)}")
 
 # Main-functie
 if __name__ == "__main__":
-    medicine_name = "asa"  # Vervang dit door de naam van het medicijn dat je wilt gebruiken
-    atc_cluster = "antistolling"  # Vervang dit door de ATC-clusterNAAM die je wilt gebruiken 
+    medicine_name = "metoprolol"  # Vervang dit door de naam van het medicijn dat je wilt gebruiken
+    atc_cluster = "betablokkers"  # Vervang dit door de ATC-clusterNAAM die je wilt gebruiken 
     
-    client = CLIENT    
-    DEBUG_MODE = False  # Zet op False om debug-informatie niet af te drukken
-    EVALUATION_MODE = False #zet op True om de evaluatie uit te voeren
-
+    DEBUG_MODE = True  # Set to True to see debug information
+    
+    # Initialize the client
+    try:
+        print("\nInitializing OpenAI client...")
+        CLIENT = initialize_openai_client()
+        print("OpenAI client initialized successfully")
+    except Exception as e:
+        print(f"Error initializing OpenAI client: {e}")
+        exit(1)
+    
     try:
         medicine_info = fetch_medicine_info(medicine_name, atc_cluster)
         if not medicine_info or "No relevant information found" in medicine_info:
@@ -301,8 +221,8 @@ if __name__ == "__main__":
 
     # Haal relevante informatie op
     try:
-        relevant_info = extract_relevant_info(client, medicine_info, random_category)
-        print("DEBUG: Relevante informatie:")
+        relevant_info = extract_relevant_info(CLIENT, medicine_info, random_category)
+        print("Relevante informatie:")
         print(relevant_info)
     except Exception as e:
         print(f"Error extracting relevant information: {e}")
@@ -311,7 +231,7 @@ if __name__ == "__main__":
     #Genereer een quizvraag
     print("\nQuizvraag genereren...")
     query = f"De vraag moet gaan over {medicine_name} en betrekking hebben op de categorie: {random_category}."    
-    print (f"\n\nQuery: {query}")
+    print (f"\n\nQuery: {query}\n")
     try:
         response = generate_quiz_question(query, medicine_info, random_category)
         # Print de stappen
@@ -333,22 +253,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error: {e}")
     
-    #check the quality of the response
-    if EVALUATION_MODE:
-        print("\n\nEvaluatie van de quizvraag...")
-        try:
-            evaluation = evaluation(client, response, relevant_info)
-            
-            print("\nEvaluatie resultaten:")
-            print(f"Consistentie: {'Ja' if evaluation.is_consistent else 'Nee'}")
-            print(f"Score: {evaluation.score:.2f}")
-            print("\nFeedback:")
-            print(evaluation.feedback)
-            print("\nVerbeterpunten:")
-            for suggestion in evaluation.improvement_suggestions:
-                print(f"- {suggestion}")
-                
-        except Exception as e:
-            print(f"Error tijdens evaluatie: {e}")
-
-# %%
+    
