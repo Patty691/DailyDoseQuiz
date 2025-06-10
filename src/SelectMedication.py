@@ -29,12 +29,12 @@ def weighted_selection_unique(choices: list[str], gewichten: list[float], k: int
     """
     Selecteer `k` unieke items uit `choices` op basis van hun gewichten.
     Deze functie wordt alleen gebruikt voor cluster selectie (ATC5 niveau).
-    
+
     Args:
         choices: Lijst van items om uit te kiezen
         gewichten: Lijst van gewichten uit de database voor elk item
         k: Aantal te selecteren items
-        
+
     Returns:
         Lijst van uniek geselecteerde items
     """
@@ -43,7 +43,7 @@ def weighted_selection_unique(choices: list[str], gewichten: list[float], k: int
         
     selected = []
     available_indices = list(range(len(choices)))
-    
+
     for _ in range(min(k, len(choices))):
         if not available_indices:
             break
@@ -62,7 +62,7 @@ def weighted_selection_unique(choices: list[str], gewichten: list[float], k: int
         chosen_idx = random.choices(available_indices, normalized_gewichten, k=1)[0]
         selected.append(choices[chosen_idx])
         available_indices.remove(chosen_idx)
-    
+
     return selected
 
 def weighted_selection_cluster(atc_clusters: dict[str, any], num_clusters: int = 1) -> tuple[list[str], dict[str, float]]:
@@ -85,7 +85,7 @@ def weighted_selection_cluster(atc_clusters: dict[str, any], num_clusters: int =
         # Sla clusters over zonder geldige ATC7 codes
         if not all(len(med.get("atc7", "")) == 7 for med in cluster.get("geneesmiddelen", [])):
             continue
-            
+
         valid_clusters.append(atc5_code)
         # Gebruik het gewicht dat al in de database staat
         gewichten.append(cluster["statistiek"]["gewicht"])
@@ -153,7 +153,7 @@ def select_medication(atc_cluster: str = None, num_clusters: int = 1, num_medici
     # Laad medicatie data met vooraf berekende gewichten
     filename = "data/MedicationClustersDatabase.json"
     atc_clusters = load_data(filename)
-    
+
     if not atc_clusters:
         return {"error": "Kan medicatie database niet laden"}
     
@@ -171,7 +171,7 @@ def select_medication(atc_cluster: str = None, num_clusters: int = 1, num_medici
         else:
             # Selecteer clusters op basis van gewichten uit database
             selected_atc5, _ = weighted_selection_cluster(atc_clusters, num_clusters)
-        
+
         # Voor elk geselecteerd cluster, selecteer medicijnen
         for atc5_code in selected_atc5:
             cluster = atc_clusters[atc5_code]
@@ -202,7 +202,7 @@ def select_medication(atc_cluster: str = None, num_clusters: int = 1, num_medici
                 })
             
             result["selected_clusters"].append(cluster_info)
-            
+
         return result
         
     except Exception as e:

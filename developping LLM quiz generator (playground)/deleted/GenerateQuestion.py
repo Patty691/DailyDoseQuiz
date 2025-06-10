@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from typing import List
 from PromptQuizQuestion import QuizPrompts
-from GetMedicineInfo import fetch_medicine_info
+from GetMedicineInfo import get_medicine_info
 
 
 """ 
@@ -71,31 +71,10 @@ def initialize_openai_client() -> instructor.Instructor:
     # Get the OpenAI API key from the environment
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
-    # Debug information
-    print("Checking OpenAI API key configuration...")
-    if openai_api_key:
-        print("API key found in environment variables")
-    else:
-        print("API key not found in environment variables")
-        # Try to load from .env file directly
-        try:
-            with open('.env', 'r') as env_file:
-                print("Contents of .env file:")
-                print(env_file.read())
-        except FileNotFoundError:
-            print(".env file not found in current directory")
-        except Exception as e:
-            print(f"Error reading .env file: {e}")
-
     if not openai_api_key:
         raise ValueError("OpenAI API key not found. Please set it in the .env file.")
 
-    # Initialize the OpenAI client
-    try:
-        client = OpenAI(api_key=openai_api_key)
-        return instructor.from_openai(client)
-    except Exception as e:
-        raise RuntimeError(f"Failed to initialize OpenAI client: {e}")
+    return instructor.from_openai(OpenAI())
 
 
 # Function to fetch medicine information from www.apotheek.nl

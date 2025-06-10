@@ -1,0 +1,7 @@
+langchain==0.1.12
+langchain-core==0.1.32
+langchain-openai==0.0.8
+python-dotenv==1.0.1
+openai==1.14.2
+pydantic==2.6.4
+typing-extensions==4.10.0 

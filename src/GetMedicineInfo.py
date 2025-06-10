@@ -5,6 +5,8 @@ import requests
 from bs4 import BeautifulSoup
 from typing import Optional
 
+#merknaam toevoegen bij: Ga naar www.apotheek.nl en zoek de pagina met informatie over '{medicine_name}'.\n\n"
+                            
 """
 This code fetches medication information from a website and caches it for future use.
 
@@ -97,10 +99,8 @@ def ask_for_alternative_url(medicine_name: str, atc_cluster: str) -> Optional[st
             print(f"\nJe hebt ervoor gekozen om geen URL op te zoeken. Het medicijn '{medicine_name}' wordt overgeslagen.")
             return False
         elif user_choice == "ja":
-            return input(f"\nGa naar www.apotheek.nl en zoek de pagina met informatie over '{medicine_name}'.\n\n"
-                            f"Let op dat:\n"
-                            f"1. De informatie betrekking heeft op ATC-cluster '{atc_cluster}'.\n"
-                            f"2. De informatie begint met een sectie 'Belangrijk om te weten'.\n\n"
+            return input(f"\nGa naar www.apotheek.nl en zoek de pagina met informatie over '{medicine_name} uit {atc_cluster}'.\n\n"
+                            f"Let op dat de informatie begint met een sectie 'Belangrijk om te weten'.\n\n"
                             f"Plak de volledige URL hier en druk op enter: ").strip()
         else:
             print("Ongeldige invoer. Typ 'ja' of 'nee'.")

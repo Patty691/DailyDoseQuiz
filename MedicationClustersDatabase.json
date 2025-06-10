@@ -1,0 +1,76 @@
+import requests
+from bs4 import BeautifulSoup
+
+def fetch_medicine_info(medicine_name: str) -> str:
+    """
+    Haalt informatie over een medicijn op van www.apotheek.nl.
+
+    Args:
+        medicine_name (str): De naam van het medicijn om te zoeken.
+
+    Returns:
+        str: Een samenvatting van de informatie over het medicijn.
+    """
+    try:
+        # Stel de zoek-URL samen
+        base_url = "https://www.apotheek.nl/zoeken"
+        params = {"q": medicine_name}
+        response = requests.get(base_url, params=params)
+
+        # Controleer of de aanvraag succesvol was
+        if response.status_code != 200:
+            raise RuntimeError(f"Fout bij ophalen van data van apotheek.nl (status code: {response.status_code})")
+
+        # Parse de HTML-inhoud
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Haal relevante informatie op (bijv. de eerste zoekresultaat-samenvatting)
+        result = soup.find("div", class_="search-result")
+        if not result:
+            return f"Geen informatie gevonden voor {medicine_name} op apotheek.nl."
+
+        # Haal de samenvattingstekst op
+        summary = result.find("p").get_text(strip=True)
+        return summary
+
+    except Exception as e:
+        raise RuntimeError(f"Fout bij ophalen van medicijninformatie: {e}")
+
+def generate_quiz_question_with_function_calling(query: str) -> str:
+    """
+    Genereert een quizvraag met behulp van informatie van apotheek.nl.
+
+    Args:
+        query (str): De naam van het medicijn om informatie over op te halen.
+
+    Returns:
+        str: De gegenereerde quizvraag.
+    """
+    try:
+        # Haal informatie over het medicijn op
+        medicine_info = fetch_medicine_info(query)
+
+        # Genereer een quizvraag op basis van de opgehaalde informatie
+        quiz_question = (
+            f"Gebruik de volgende informatie over {query}:\n\n"
+            f"{medicine_info}\n\n"
+            "Wat is de belangrijkste toepassing van dit medicijn?"
+        )
+        return quiz_question
+
+    except Exception as e:
+        return f"Fout bij het genereren van de quizvraag: {e}"
+
+def main():
+    """
+    Hoofdprogramma dat een medicijnnaam vraagt en een quizvraag genereert.
+    """
+    print("Welkom bij de quizgenerator!")
+    query = input("Voer de naam van een medicijn in: ").strip()
+    quiz_question = generate_quiz_question_with_function_calling(query)
+    print("\nGegenereerde quizvraag:")
+    print(quiz_question)
+
+# Zorg ervoor dat het programma alleen wordt uitgevoerd als het direct wordt aangeroepen
+if __name__ == "__main__":
+    main()

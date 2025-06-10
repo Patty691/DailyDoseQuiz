@@ -9,6 +9,22 @@ from GenerateQuestion import generate_quiz_question
 # Evaluation system temporarily disabled - will be added back later
 # from EvaluateQuestion import QuestionEvaluator
 
+"""TODO
+controleer of alle functionaliteit gebruikt wordt (zoals gewichten en randomisatie)
+beter verdiepen in langchain. wordt nu niet (echt) gebruikt. is het handig om dit in te bouwen, zo ja waarom?
+merknaam toevoegen aan output,op meerdere plekken.
+ 1: nodig om juiste informatie te vinden (bij zelf url plakken)
+ 2: evaluatie van de vraag (past de vraag bij dit geneesmiddel of was de geneesmiddeltekst bijv. te algemeen (vb. insulines))
+
+ database bouwen
+ - al rekening houden met evaluatiefunctie
+
+ evaluatiefunctie bouwen
+ -human in the loop
+
+
+ """
+
 NUM_CLUSTERS = 1      # Aantal ATC5 clusters om te selecteren
 NUM_MEDICINES = 1     # Aantal geneesmiddelen om te selecteren per cluster
 
