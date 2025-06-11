@@ -7,9 +7,7 @@ from typing import Optional, Dict, Any
 import re
 from urllib.parse import urlparse, unquote
 
-# script aanpassen naar eerdere versie:         elif user_choice == "ja":
-# nu ontstaat er een oneindige loop als niet de juiste url wordt ingevoerd.
-# in BuildQuestion --> brand_name doorgeven aan get_medicine_info
+#merknaam toevoegen bij: Ga naar www.apotheek.nl en zoek de pagina met informatie over '{medicine_name}'.\n\n"
                             
 """
 This code fetches medication information from a website and caches it for future use.
@@ -18,14 +16,13 @@ Set the CACHE_EXPIRATION_DAYS variable to determine when the cached information 
 
 """
 
-# Configuratie
 CACHE_FILE = "medicine_info_cache.json"
 CACHE_EXPIRATION_DAYS = 30
 DEBUG_MODE = False
 
 def debug_print(*args, **kwargs):
-    """Print alleen als debug mode aan staat."""
-    if DEBUG_MODE:
+    """Print alleen als debug mode aan staat of als het script direct wordt uitgevoerd."""
+    if DEBUG_MODE or __name__ == "__main__":
         print(*args, **kwargs)
 
 #Hoofdfunctie
@@ -66,8 +63,6 @@ def get_medicine_info(medicine_name: str, atc_cluster: str, brand_name: str = No
                         medicine_info = parse_medicine_page(response.text)
                         save_to_cache(medicine_name, url, medicine_info, atc_cluster)
                         return medicine_info
-                    else:
-                        print(f"\nDe URL uit de cache werkt niet meer of bevat niet de juiste informatie voor '{medicine_name}'.")
                 cache_url_attempted = True
 
             # Als de cache-URL niet werkt, probeer de standaard URL
@@ -79,8 +74,6 @@ def get_medicine_info(medicine_name: str, atc_cluster: str, brand_name: str = No
                     medicine_info = parse_medicine_page(response.text)
                     save_to_cache(medicine_name, base_url, medicine_info, atc_cluster)
                     return medicine_info
-                else:
-                    print(f"\nDe standaard URL werkt niet voor '{medicine_name}' of bevat niet de juiste informatie.")
                 base_url_attempted = True
 
             # Als beide URLs niet werken, vraag om een alternatieve URL
@@ -92,9 +85,6 @@ def get_medicine_info(medicine_name: str, atc_cluster: str, brand_name: str = No
                 medicine_info = parse_medicine_page(response.text)
                 save_to_cache(medicine_name, new_url, medicine_info, atc_cluster)
                 return medicine_info
-            else:
-                print(f"\nDe opgegeven URL werkt niet of bevat niet de juiste informatie voor '{medicine_name}'.")
-                continue
 
         except Exception as e:
             debug_print(f"Fout bij ophalen informatie: {str(e)}")
@@ -114,31 +104,20 @@ def ask_for_alternative_url(medicine_name: str, atc_cluster: str, brand_name: st
     """Vraag de gebruiker om een alternatieve URL."""
     search_name = f"{medicine_name} ({brand_name})" if brand_name else medicine_name
     while True:
-        user_choice = input("\nWil je handmatig een andere URL opzoeken? (ja/nee): ").strip().lower()
-        if user_choice == "nee":
-            print(f"\nJe hebt ervoor gekozen om geen URL op te zoeken. Het medicijn '{medicine_name}' wordt overgeslagen.")
-            return None
-        elif user_choice == "ja":
-            url = input(f"\n\nGa naar www.apotheek.nl en zoek de pagina met informatie over '{search_name}' uit atc-cluster '{atc_cluster}'.\n\n"
-                       f"Let op dat de informatie begint met een sectie 'Belangrijk om te weten'.\n\n"
-                       f"Plak de volledige URL hier en druk op enter: ").strip()
-            if not url:
-                print("Geen URL ingevoerd. Probeer opnieuw.")
-                continue
-            
-            # Controleer of de URL geldig is
-            try:
-                response = requests.get(url)
-                if response.status_code == 200 and "Belangrijk om te weten" in response.text:
-                    return url
-                else:
-                    print(f"\nDe opgegeven URL werkt niet of bevat niet de juiste informatie voor '{medicine_name}'.")
-                    continue
-            except Exception as e:
-                print(f"\nDe opgegeven URL is ongeldig: {str(e)}")
-                continue
+        url = input(f"\nGeef de URL voor informatie over '{search_name}' uit ATC-cluster '{atc_cluster}':\n> ")
+        if url:
+            return url
+        debug_print("Geen URL ingevoerd. Probeer opnieuw.")
+
+def retry_prompt(medicine_name: str) -> bool:
+    while True:
+        choice = input(f"\nWil je het opnieuw proberen voor {medicine_name}? (ja/nee): ").strip().lower()
+        if choice == "ja":
+            return True
+        elif choice == "nee":
+            return False
         else:
-            print("Ongeldige invoer. Typ 'ja' of 'nee'.")
+            debug_print("Ongeldige invoer. Typ 'ja' of 'nee'.")      
 
 def parse_medicine_page(html: str) -> str:
     """Parse de HTML van de medicijnpagina en extraheer de relevante informatie."""
@@ -197,22 +176,21 @@ def save_to_cache(medicine_name: str, url: str, info: str, atc_cluster: str):
 
 if __name__ == "__main__":
     # Zet debug mode aan voor directe uitvoering
-    DEBUG_MODE = True
+    DEBUG_MODE = False
     
-    medicine_name = "aol"
+    medicine_name = "apurinol"
     atc_cluster = "colestyramine"
     brand_name = "test"
     
     # Debug output
-    debug_print("--------------------------------")
-    debug_print("Debug mode aan")
-    debug_print("--------------------------------")
-    debug_print(f"\nZoeken naar informatie over geneesmiddel: {medicine_name}")
-    debug_print(f"ATC-cluster: {atc_cluster}")
-    debug_print(f"Merknaam: {brand_name}")
+    debug_print(f"\nDebug: Zoeken naar informatie over {medicine_name}")
+    debug_print(f"Debug: ATC-cluster: {atc_cluster}")
+    debug_print(f"Debug: Merknaam: {brand_name}")
     
     # Haal informatie op
     medicine_info = get_medicine_info(medicine_name, atc_cluster, brand_name)
     
-
+    # Toon resultaat
+    debug_print("\nGevonden informatie:")
+    debug_print(medicine_info)
     

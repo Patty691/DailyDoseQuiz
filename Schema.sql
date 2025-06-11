@@ -2,7 +2,7 @@
 -- Locatie: /Users/pattynooijen/Documents/VisualStudioCode/daily_dose_quiz/schema.sql
 
 -- Stap 1: Information (startpunt, hier wordt de UUID gegenereerd)
-CREATE TABLE information (
+CREATE TABLE IF NOT EXISTS information (
    id INTEGER PRIMARY KEY,
    quiz_question_uuid TEXT UNIQUE,
    atc7_code TEXT,
@@ -15,7 +15,7 @@ CREATE TABLE information (
 );
 
 -- Stap 2: Gegenereerde quizvraag
-CREATE TABLE generated_quiz_questions (
+CREATE TABLE IF NOT EXISTS generated_quiz_questions (
    id INTEGER PRIMARY KEY,
    quiz_question_uuid TEXT,
    information_id INTEGER,
@@ -34,7 +34,7 @@ CREATE TABLE generated_quiz_questions (
 );
 
 -- Stap 3: Evaluatie
-CREATE TABLE evaluations (
+CREATE TABLE IF NOT EXISTS evaluations (
    id INTEGER PRIMARY KEY,
    quiz_question_uuid TEXT,
    quiz_question_id INTEGER,
@@ -54,7 +54,7 @@ CREATE TABLE evaluations (
 );
 
 -- Goedgekeurde quizvraag
-CREATE TABLE approved_questions (
+CREATE TABLE IF NOT EXISTS approved_questions (
    id INTEGER PRIMARY KEY,
    quiz_question_uuid TEXT,
    quiz_question_id INTEGER,
@@ -74,7 +74,7 @@ CREATE TABLE approved_questions (
 );
 
 -- Gebruik van de vraag
-CREATE TABLE question_usage (
+CREATE TABLE IF NOT EXISTS question_usage (
    id INTEGER PRIMARY KEY,
    quiz_question_uuid TEXT,
    approved_question_id INTEGER,
@@ -87,4 +87,28 @@ CREATE TABLE question_usage (
    percentage_juist REAL,
    FOREIGN KEY(approved_question_id) REFERENCES approved_questions(id),
    FOREIGN KEY(quiz_question_uuid) REFERENCES information(quiz_question_uuid)
+);
+
+CREATE TABLE IF NOT EXISTS quiz_questions (
+    id INTEGER PRIMARY KEY,
+    medicine TEXT,
+    category TEXT,
+    question TEXT,
+    correct_answer TEXT,
+    wrong_answers TEXT,
+    llm_raw_output TEXT,
+    atc7 TEXT,
+    brand TEXT,
+    atc5 TEXT,
+    cluster_name TEXT,
+    timestamp TEXT
+);
+
+CREATE TABLE IF NOT EXISTS process_logs (
+    id INTEGER PRIMARY KEY,
+    event_type TEXT,
+    medicine TEXT,
+    category TEXT,
+    message TEXT,
+    timestamp TEXT
 );
