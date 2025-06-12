@@ -6,7 +6,14 @@ from dotenv import load_dotenv
 from typing import Dict, Any, List, Optional
 import uuid
 
+
+
+#probleem met code. geen goede terminologie. overal worden andere termen gebruikt. ga na hoe brand name uit select medication te halen.
 # LangChain tracing activeren
+# in BuildQuestion --> brand_name doorgeven aan get_medicine_info. INGBOUWD, MAAR werkt niet. zorg voor een goede oplossing.
+
+# in debug mode: gegenereerde vraag mag in leesbaarder format.
+
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY", "VUL_HIER_JE_LSMITH_API_KEY_IN")
 
@@ -219,9 +226,8 @@ class QuestionGenerator:
     def generate_question(self, medicine_name: str, medicine_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Genereer een quiz vraag voor een medicijn."""
         try:
-            if self.debug_mode:
-                print(f"\nGenereren vraag voor {medicine_name}")
-                print(f"Beschikbare informatie: {json.dumps(medicine_info, indent=2)}")
+
+    
 
             # Genereer de vraag
             question = generate_quiz_question(
@@ -308,9 +314,10 @@ class QuizGenerationPipeline:
             for med in cluster["geneesmiddelen"]:
                 self.question_generator.stats_manager.increment_total_medications()
                 med_name = med["naam"].lower()
+                brand_name = med.get("merknaam", None)
                 
                 try:
-                    info = get_medicine_info(med_name, cluster["naam"])
+                    info = get_medicine_info(med_name, cluster["naam"], brand_name, debug_mode=self.debug_mode)
                     if not info or "Geen informatie beschikbaar" in info:
                         self.db_manager.log_process("warning", med_name, '', "Geen informatie gevonden, medicijn overgeslagen")
                         self.question_generator.stats_manager.add_failed_medication(
@@ -323,7 +330,7 @@ class QuizGenerationPipeline:
                     cluster_info["medications"][med_name] = {
                         "info": info,
                         "atc7": med["atc7"],
-                        "brand": med.get("brand", "")
+                        "brand": med.get("merknaam", "")
                     }
                     self.question_generator.stats_manager.increment_successful_medications()
                 except Exception as med_error:
@@ -389,7 +396,9 @@ class QuizGenerationPipeline:
 
 def main():
     try:
-        pipeline = QuizGenerationPipeline(debug_mode=True)
+        # Debug mode instellen voor het hele proces
+        debug_mode = False  # Zet op False om debug output uit te schakelen
+        pipeline = QuizGenerationPipeline(debug_mode=debug_mode)
         pipeline.generate_quiz()
     except Exception as e:
         db_manager = DatabaseManager()

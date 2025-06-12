@@ -89,27 +89,9 @@ def generate_quiz_question(medicine_name: str, medicine_info: str, debug_mode: b
                 {"role": "user", "content": query}
             ],  
         )                  
-
-        if debug_mode:
-            parsed = response.choices[0].message.parsed.final_resolution
-            print("\nGegenereerde quizvraag:")
-            print(f"\nIntroductie: {parsed.introductie}")
-            print(f"\nVraag: {parsed.vraag}")
-            print("\nAntwoordopties:")
-            for index, option in enumerate(parsed.antwoordopties, start=1):
-                print(f"{chr(64 + index)}) {option}")  # Converteer index naar A, B, C, D
-            print(f"\nAntwoord: {parsed.antwoord}")
-            print(f"\nUitleg: {parsed.uitleg}\n")
-            
-        return response.choices[0].message.parsed.final_resolution
+        return response.choices[0].message.parsed
             
     except Exception as e:
-        if debug_mode:
-            print(f"\nError details:")
-            print(f"Error type: {type(e)}")
-            print(f"Error message: {str(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
         raise RuntimeError(f"Failed to generate complete quiz question: {e}")
 
 
@@ -159,7 +141,7 @@ if __name__ == "__main__":
     medicine_name = "metoprolol"  # Vervang dit door de naam van het medicijn dat je wilt gebruiken
     atc_cluster = "geen"  # Vervang dit door de ATC-clusterNAAM die je wilt gebruiken 
     brand_name = "emcor"
-    DEBUG_MODE = False  # Zet op False om debug-informatie niet af te drukken
+    DEBUG_MODE = True  # Zet op False om debug-informatie niet af te drukken
         
     try:
         medicine_info = get_medicine_info(medicine_name, atc_cluster, brand_name, debug_mode = DEBUG_MODE)
@@ -169,6 +151,15 @@ if __name__ == "__main__":
             
         response = generate_quiz_question(medicine_name, medicine_info, DEBUG_MODE)
         
+        # Print de final_resolution
+        print("\nGegenereerde quizvraag:")
+        print(f"\n\nIntroductie: {response.final_resolution.introductie}")
+        print(f"\nVraag: {response.final_resolution.vraag}")
+        print("\nAntwoordopties:")
+        for index, option in enumerate(response.final_resolution.antwoordopties, start=1):
+            print(f"{chr(64 + index)}) {option}")  # Converteer index naar A, B, C, D
+        print(f"\nAntwoord: {response.final_resolution.antwoord}")
+        print(f"\nUitleg: {response.final_resolution.uitleg}\n\n")
 
     except Exception as e:
         print(f"Error: {e}")

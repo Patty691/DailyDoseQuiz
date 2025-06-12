@@ -29,11 +29,20 @@ def debug_print(*args, **kwargs):
         print(*args, **kwargs)
 
 #Hoofdfunctie
-def get_medicine_info(medicine_name: str, atc_cluster: str, brand_name: str = None) -> str:
+def get_medicine_info(medicine_name: str, atc_cluster: str, brand_name: str = None, debug_mode: bool = None) -> str:
+    """Haal informatie op over een medicijn van apotheek.nl."""
+    global DEBUG_MODE
+    if debug_mode is not None:
+        DEBUG_MODE = debug_mode
+    
     cache_checked = False 
     cache_url_attempted = False  
     base_url_attempted = False  
 
+    debug_print(f"\nGeneesmiddel: {medicine_name}")
+    debug_print(f"ATC-cluster: {atc_cluster}")
+    debug_print(f"Merknaam: {brand_name}")
+    
     while True:
         try:
             # Controleer de cache en gebruik de informatie als deze actueel is
@@ -80,7 +89,7 @@ def get_medicine_info(medicine_name: str, atc_cluster: str, brand_name: str = No
                     save_to_cache(medicine_name, base_url, medicine_info, atc_cluster)
                     return medicine_info
                 else:
-                    print(f"\nDe standaard URL werkt niet voor '{medicine_name}' of bevat niet de juiste informatie.")
+                    print("\nDe standaard URL werkt niet of bevat niet de juiste informatie.")
                 base_url_attempted = True
 
             # Als beide URLs niet werken, vraag om een alternatieve URL
@@ -196,8 +205,8 @@ def save_to_cache(medicine_name: str, url: str, info: str, atc_cluster: str):
     debug_print(f"De informatie is opgeslagen op: {cache[medicine_name]['date']}\n\n")
 
 if __name__ == "__main__":
-    # Zet debug mode aan voor directe uitvoering
-    DEBUG_MODE = True
+    # Debug mode instellen
+    DEBUG_MODE = True  # Zet op False om debug output uit te schakelen
     
     medicine_name = "aol"
     atc_cluster = "colestyramine"
@@ -207,12 +216,8 @@ if __name__ == "__main__":
     debug_print("--------------------------------")
     debug_print("Debug mode aan")
     debug_print("--------------------------------")
-    debug_print(f"\nZoeken naar informatie over geneesmiddel: {medicine_name}")
-    debug_print(f"ATC-cluster: {atc_cluster}")
-    debug_print(f"Merknaam: {brand_name}")
     
     # Haal informatie op
     medicine_info = get_medicine_info(medicine_name, atc_cluster, brand_name)
     
-
-    
+    debug_print("\n--------------------------------\n")
