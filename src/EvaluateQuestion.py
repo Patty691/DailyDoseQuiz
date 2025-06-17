@@ -4,8 +4,8 @@ from typing import Dict, Any, Tuple
 from OutputModels import Response, Evaluation
 import json
 
-
-#automatisch gegenereerd. functie nog beoordelen en aanpassen.
+#nog niet in gebruik, dit is een voorbeeld van de opzet.
+#AI gegenereerd, functies nog beoordelen en aanpassen.
 
 
 class QuestionEvaluator:

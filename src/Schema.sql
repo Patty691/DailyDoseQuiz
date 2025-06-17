@@ -1,20 +1,38 @@
 -- Database schema voor quizgenerator
 -- Locatie: /Users/pattynooijen/Documents/VisualStudioCode/daily_dose_quiz/schema.sql
 
--- Stap 1: Information (startpunt, hier wordt de UUID gegenereerd)
-CREATE TABLE IF NOT EXISTS information (
+-- Stap 1: Geselecteerde medicatie
+CREATE TABLE IF NOT EXISTS selected_medications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT UNIQUE,                  -- Unieke identifier voor de selectie
+    atc5_code TEXT NOT NULL,           -- ATC5 code van het cluster
+    cluster_name TEXT NOT NULL,        -- Naam van het cluster
+    cluster_weight REAL,               -- Gewicht van het cluster
+    atc7_code TEXT NOT NULL,           -- ATC7 code van het medicijn
+    medicine_name TEXT NOT NULL,       -- Naam van het medicijn
+    brand_name TEXT,                   -- Merknaam van het medicijn
+    medicine_weight REAL,              -- Gewicht van het medicijn
+    selection_date DATETIME DEFAULT (datetime('now', 'localtime'))  -- Datum en tijd van selectie in lokaal formaat
+); 
+
+
+
+
+
+-- Stap 2: Geselecteerde informatie
+CREATE TABLE IF NOT EXISTS medicine_information (
    id INTEGER PRIMARY KEY,
-   quiz_question_uuid TEXT UNIQUE,
-   atc7_code TEXT,
-   kenniscategorie TEXT,
-   bron_url TEXT,
-   timestamp_opgeslagen TEXT,
-   geëxtraheerde_informatie TEXT,
-   llm_raw_output TEXT,
-   timestamp_gegenereerd TEXT
+   quiz_question_uuid TEXT UNIQUE,           -- Koppeling met selected_medications
+   bron_url TEXT,                           -- URL van apotheek.nl die is opgeslagen
+   timestamp_opgeslagen TEXT,               -- Wanneer de info is opgeslagen
+   kenniscategorie TEXT,                    -- Categorie van de vraag (van LLM)
+   relevante_informatie TEXT,               -- Alleen de door LLM geëxtraheerde info
+   llm_raw_output TEXT,                     -- Ruwe LLM output voor debugging
+   timestamp_gegenereerd TEXT,              -- Wanneer de vraag is gegenereerd
+   FOREIGN KEY(quiz_question_uuid) REFERENCES selected_medications(uuid)
 );
 
--- Stap 2: Gegenereerde quizvraag
+-- Stap 3: Gegenereerde quizvraag
 CREATE TABLE IF NOT EXISTS generated_quiz_questions (
    id INTEGER PRIMARY KEY,
    quiz_question_uuid TEXT,

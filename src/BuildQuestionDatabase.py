@@ -1,43 +1,34 @@
-from typing import Dict, Any, List, Optional
+import os
+import sqlite3
+import json
 from datetime import datetime
 from dotenv import load_dotenv
-import os
+from typing import Dict, Any, List, Optional
+import uuid
 
 from SelectMedication import select_medication
 from GetMedicineInfo import get_medicine_info
 from GenerateQuestion import generate_quiz_question
-# Evaluation system temporarily disabled - will be added back later
-# from EvaluateQuestion import QuestionEvaluator
-
-"""TODO
-controleer of alle functionaliteit gebruikt wordt (zoals gewichten en randomisatie)
-beter verdiepen in langchain. wordt nu niet (echt) gebruikt. is het handig om dit in te bouwen, zo ja waarom?
-merknaam toevoegen aan output,op meerdere plekken.
- 1: nodig om juiste informatie te vinden (bij zelf url plakken)
- 2: evaluatie van de vraag (past de vraag bij dit geneesmiddel of was de geneesmiddeltekst bijv. te algemeen (vb. insulines))
-
- database bouwen
- - al rekening houden met evaluatiefunctie
-
- evaluatiefunctie bouwen
- -human in the loop
 
 
- """
+# LangChain tracing activeren
+# Opslag naar DB inbouwen
 
-NUM_CLUSTERS = 1      # Aantal ATC5 clusters om te selecteren
-NUM_MEDICINES = 1     # Aantal geneesmiddelen om te selecteren per cluster
 
-class QuizGenerationPipeline:
-    def __init__(self, debug_mode: bool = True):  # Default debug mode to True
-        """
-        Initialiseer de quiz generatie pipeline.
-        
-        Args:
-            debug_mode: Of debug informatie moet worden getoond
-        """
-        load_dotenv()
-        self.debug_mode = debug_mode
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY", "VUL_HIER_JE_LSMITH_API_KEY_IN")
+
+
+# Configuratie
+NUM_CLUSTERS = 1
+NUM_MEDICINES = 1
+DB_PATH = "/Users/pattynooijen/Documents/VisualStudioCode/daily_dose_quiz/data/QuizQuestions.db"
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "Schema.sql")
+
+# Basis componenten
+class StatisticsManager:
+    """Beheert statistieken voor het quiz generatie proces."""
+    def __init__(self):
         self.stats = {
             "start_time": datetime.now(),
             "clusters_processed": 0,
@@ -48,335 +39,451 @@ class QuizGenerationPipeline:
             "categories_used": set(),
             "errors": []
         }
-        # Evaluation system temporarily disabled
-        # self.evaluator = QuestionEvaluator(model_name=model_name)
-        self._setup_chains()
 
-    def _setup_chains(self):
-        # Medication Selection Chain
-        # This chain selects a medication based on ATC clusters and weights
-        self.medication_chain = select_medication
+    def increment_clusters_processed(self):
+        self.stats["clusters_processed"] += 1
 
-        # Medicine Info Chain
-        # This chain fetches and processes medication information
-        self.info_chain = get_medicine_info
-        
-        # For now, we'll handle the chain sequence manually since SequentialChain is deprecated
-        self.full_chain = self._create_chain_sequence
+    def increment_total_medications(self):
+        self.stats["total_medications"] += 1
 
-    def _create_chain_sequence(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def increment_successful_medications(self):
+        self.stats["successful_medications"] += 1
+
+    def increment_questions_generated(self):
+        self.stats["questions_generated"] += 1
+
+    def add_failed_medication(self, name: str, cluster: str, reason: str):
+        self.stats["failed_medications"].append({
+            "name": name,
+            "cluster": cluster,
+            "reason": reason
+        })
+
+    def add_error(self, error: str):
+        self.stats["errors"].append(error)
+
+    def add_category(self, category: str):
+        self.stats["categories_used"].add(category)
+
+class DatabaseManager:
+    """Beheert database operaties voor quiz vragen en logging."""
+    def __init__(self, db_path: str = DB_PATH, schema_path: str = SCHEMA_PATH):
+        self.db_path = db_path
+        self.schema_path = schema_path
+        self._init_db()
+
+    def _init_db(self):
+        if not os.path.exists(self.schema_path):
+            raise FileNotFoundError(f"schema.sql niet gevonden op: {self.schema_path}")
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        with open(self.schema_path, "r", encoding="utf-8") as f:
+            schema_sql = f.read()
+            c.executescript(schema_sql)
+        conn.commit()
+        conn.close()
+
+    def save_selected_medications(self, selected_medications: Dict[str, Any]) -> None:
         """
-        Manual implementation of chain sequence to replace SequentialChain
+        Sla geselecteerde medicatie op in de database.
         
         Args:
-            inputs (Dict[str, Any]): Input variables including atc_cluster
-            
-        Returns:
-            Dict[str, Any]: Combined output from all chains
+            selected_medications: Dict met geselecteerde medicatie informatie
         """
-        try:
-            # Step 1: Select medication
-            medication_result = self.medication_chain(
-                atc_cluster=inputs.get("atc_cluster"),
-                num_clusters=1,
-                num_medicines=1
-            )
-            
-            if "error" in medication_result:
-                raise ValueError(f"Medication selection failed: {medication_result['error']}")
-            
-            # Step 2: Get medicine info
-            medicine_info = self.info_chain(medication_result)
-            
-            # Step 3: Generate quiz question using the complete process
-            quiz_question = generate_quiz_question(
-                medicine_name=medication_result["naam"],
-                medicine_info=medicine_info,
-                debug_mode=self.debug_mode
-            )
-            
-            return {
-                "selected_medication": medication_result,
-                "medicine_info": medicine_info,
-                "quiz_question": quiz_question
-            }
-            
-        except Exception as e:
-            if self.debug_mode:
-                print(f"Error in chain sequence: {str(e)}")
-            raise
-
-    def generate_questions(self, medicine_info: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Genereer quizvragen voor alle geselecteerde medicatie.
-        
-        Args:
-            medicine_info: Medicatie informatie uit get_medicine_information
-            
-        Returns:
-            List van gegenereerde vragen met metadata
-        """
-        questions = []
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
         
         try:
-            for atc5, cluster_info in medicine_info.items():
-                for med_name, med_info in cluster_info["medications"].items():
-                    if self.debug_mode:
-                        print(f"\n{'='*80}")
-                        print(f"Genereren vraag over {med_name}")
-                        print(f"{'='*80}")
-                    
-                    try:
-                        # Gebruik de complete vraag generatie functie
-                        question = generate_quiz_question(
-                            medicine_name=med_name,
-                            medicine_info=med_info["info"],
-                            debug_mode=self.debug_mode
-                        )
-                        
-                        if not question:
-                            print(f"Waarschuwing: Geen vraag gegenereerd voor {med_name}")
-                            self.stats["failed_medications"].append({
-                                "name": med_name,
-                                "cluster": cluster_info["cluster_name"],
-                                "reason": "Vraag generatie mislukt"
-                            })
-                            continue
-                            
-                        self.stats["questions_generated"] += 1
-                        
-                        # Print de gegenereerde vraag in een duidelijk format
-                        if self.debug_mode:
-                            print("\nGegenereerde quizvraag:")
-                            print(f"{'='*40}")
-                            print(f"Introductie:\n{question.final_resolution.introductie}\n")
-                            print(f"Vraag:\n{question.final_resolution.vraag}\n")
-                            print("Antwoordopties:")
-                            for index, option in enumerate(question.final_resolution.antwoordopties, start=1):
-                                print(f"{chr(64 + index)}) {option}")
-                            print(f"\nJuiste antwoord: {question.final_resolution.antwoord}")
-                            print(f"\nUitleg:\n{question.final_resolution.uitleg}")
-                            print(f"{'='*40}\n")
-                        
-                        # Voeg metadata toe
-                        question_data = {
-                            "question": question,
-                            "metadata": {
-                                "medicine_name": med_name,
-                                "atc7": med_info["atc7"],
-                                "brand": med_info["brand"],
-                                "atc5": atc5,
-                                "cluster_name": cluster_info["cluster_name"]
-                            }
-                        }
-                        
-                        questions.append(question_data)
-                        
-                    except Exception as e:
-                        print(f"Fout bij genereren vraag voor {med_name}: {str(e)}")
-                        self.stats["failed_medications"].append({
-                            "name": med_name,
-                            "cluster": cluster_info["cluster_name"],
-                            "reason": str(e)
-                        })
-                    
-            return questions
+            for cluster in selected_medications["selected_clusters"]:
+                for medicine in cluster["geneesmiddelen"]:
+                    c.execute('''
+                        INSERT INTO selected_medications (
+                            uuid, atc5_code, cluster_name, cluster_weight,
+                            atc7_code, medicine_name, brand_name, medicine_weight
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        str(uuid.uuid4()),  # Genereer een nieuwe UUID
+                        cluster["atc5_code"],
+                        cluster["naam"],
+                        cluster["gewicht"],
+                        medicine["atc7"],
+                        medicine["naam"],
+                        medicine.get("merknaam", None),
+                        medicine["gewicht"]
+                    ))
+            
+            conn.commit()
             
         except Exception as e:
-            self.stats["errors"].append(str(e))
-            raise RuntimeError(f"Fout bij genereren van vragen: {str(e)}")
+            conn.rollback()
+            raise RuntimeError(f"Fout bij opslaan geselecteerde medicatie: {str(e)}")
+            
+        finally:
+            conn.close()
 
-    def generate_quiz(self, atc_cluster: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Hoofdfunctie die het hele proces van vraag generatie doorloopt.
-        Gebruikt de configuratie uit SelectMedication.py.
-        
-        Args:
-            atc_cluster: Optioneel specifiek ATC cluster
-            
-        Returns:
-            List van gegenereerde vragen met metadata
-        """
-        try:
-            # 1. Selecteer medicatie
-            selected_meds = self.select_medications(atc_cluster)
-            
-            # 2. Haal medicatie informatie op
-            medicine_info = self.get_medicine_information(selected_meds)
-            
-            # 3. Genereer vragen
-            questions = self.generate_questions(medicine_info)
-            
-            return questions
-            
-        except Exception as e:
-            if self.debug_mode:
-                print(f"\nFout tijdens quiz generatie: {str(e)}")
-            return []
+    def save_information_and_quiz_question(self, **kwargs):
+        quiz_question_uuid = str(uuid.uuid4())
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
 
-    def generate_report(self) -> str:
-        """
-        Genereer een samenvattend rapport van het vraag generatie proces.
-        
-        Returns:
-            str: Het rapport in leesbare tekst
-        """
-        end_time = datetime.now()
-        duration = end_time - self.stats["start_time"]
-        
-        report = [
-            "\n=== Quiz Generatie Rapport ===",
-            f"\nUitvoering gestart op: {self.stats['start_time'].strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Duur: {duration.total_seconds():.1f} seconden",
-            
-            "\nVerwerkte gegevens:",
-            f"- Clusters verwerkt: {self.stats['clusters_processed']}",
-            f"- Totaal medicijnen: {self.stats['total_medications']}",
-            f"- Succesvol verwerkt: {self.stats['successful_medications']}",
-            f"- Vragen gegenereerd: {self.stats['questions_generated']}",
-            
-            "\nNiet verwerkte medicijnen:"
-        ]
-        
-        if self.stats["failed_medications"]:
-            for med in self.stats["failed_medications"]:
-                report.append(f"- {med['name']} (cluster: {med['cluster']})")
-                report.append(f"  Reden: {med['reason']}")
-        else:
-            report.append("- Geen")
-            
-        if self.stats["errors"]:
-            report.extend([
-                "\nOpgetreden fouten:",
-                "- " + "\n- ".join(self.stats["errors"])
-            ])
-            
-        success_rate = (self.stats["successful_medications"] / self.stats["total_medications"] * 100) if self.stats["total_medications"] > 0 else 0
-        
-        report.extend([
-            f"\nSamenvatting:",
-            f"- Succes percentage: {success_rate:.1f}%",
-            f"- Gemiddeld aantal vragen per medicijn: {self.stats['questions_generated'] / self.stats['successful_medications']:.1f}" if self.stats['successful_medications'] > 0 else "- Geen vragen gegenereerd",
-            "\n=== Einde Rapport ===\n"
-        ])
-        
-        return "\n".join(report)
+        # Save information
+        c.execute('''
+            INSERT INTO information (
+                quiz_question_uuid, atc7_code, kenniscategorie, bron_url, timestamp_opgeslagen,
+                geëxtraheerde_informatie, llm_raw_output, timestamp_gegenereerd
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            quiz_question_uuid,
+            kwargs.get('atc7_code'),
+            kwargs.get('kenniscategorie'),
+            kwargs.get('bron_url'),
+            kwargs.get('timestamp_opgeslagen'),
+            kwargs.get('geëxtraheerde_informatie'),
+            kwargs.get('llm_info_raw_output'),
+            kwargs.get('timestamp_gegenereerd')
+        ))
+        information_id = c.lastrowid
+
+        # Save quiz question
+        antwoordopties = kwargs.get('antwoordopties', [])
+        while len(antwoordopties) < 4:
+            antwoordopties.append("")
+
+        c.execute('''
+            INSERT INTO generated_quiz_questions (
+                quiz_question_uuid, information_id, introductie, vraag,
+                antwoordoptie_1, antwoordoptie_2, antwoordoptie_3, antwoordoptie_4,
+                juiste_antwoord, uitleg, llm_raw_output, timestamp_gegenereerd
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            quiz_question_uuid,
+            information_id,
+            kwargs.get('introductie'),
+            kwargs.get('vraag'),
+            antwoordopties[0],
+            antwoordopties[1],
+            antwoordopties[2],
+            antwoordopties[3],
+            kwargs.get('juiste_antwoord'),
+            kwargs.get('uitleg'),
+            kwargs.get('llm_quiz_raw_output'),
+            kwargs.get('timestamp_gegenereerd')
+        ))
+        conn.commit()
+        conn.close()
+
+    def log_process(self, event_type: str, medicine: str, category: str, message: str):
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO process_logs (event_type, medicine, category, message, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (event_type, medicine, category, message, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+
+# Quiz generatie componenten
+class MedicationSelector:
+    """Selecteert medicatie uit de database."""
+    def __init__(self, num_clusters: int = NUM_CLUSTERS, num_medicines: int = NUM_MEDICINES):
+        self.num_clusters = num_clusters
+        self.num_medicines = num_medicines
 
     def select_medications(self, atc_cluster: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Selecteer medicatie uit de database.
-        Gebruikt de configuratie uit SelectMedication.py.
-        
-        Args:
-            atc_cluster: Optioneel specifiek ATC cluster
-            
-        Returns:
-            Dict met geselecteerde medicatie informatie
-        """
         try:
             result = select_medication(
                 atc_cluster=atc_cluster,
-                num_clusters=NUM_CLUSTERS,
-                num_medicines=NUM_MEDICINES
+                num_clusters=self.num_clusters,
+                num_medicines=self.num_medicines
             )
             
             if "error" in result:
                 raise ValueError(result["error"])
                 
-            if self.debug_mode:
-                print("\nGeselecteerde medicatie:")
-                for cluster in result["selected_clusters"]:
-                    print(f"\nCluster: {cluster['naam']} (ATC5: {cluster['atc5_code']}, Gewicht: {cluster['gewicht']:.2f})")
-                    for med in cluster["geneesmiddelen"]:
-                        print(f"- {med['naam']} (ATC7: {med['atc7']}, Gewicht: {med['gewicht']:.2f})")
-                        
             return result
             
         except Exception as e:
             raise RuntimeError(f"Fout bij selecteren medicatie: {str(e)}")
 
-    def get_medicine_information(self, medication: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Haal informatie op voor geselecteerde medicatie.
-        Slaat medicijnen over waar geen informatie voor gevonden kan worden.
-        
-        Args:
-            medication: Medicatie informatie uit select_medication
-            
-        Returns:
-            Dict met medicatie informatie
-        """
+class QuestionGenerator:
+    """Genereert quiz vragen voor medicatie."""
+    def __init__(self, debug_mode: bool = True):
+        self.debug_mode = debug_mode
+        self.stats_manager = StatisticsManager()
+
+    def _validate_question_data(self, data: Any) -> Optional[Dict[str, Any]]:
+        """Valideer en converteer de LLM output naar het juiste formaat."""
         try:
-            all_info = {}
-            
-            for cluster in medication["selected_clusters"]:
-                self.stats["clusters_processed"] += 1
-                cluster_info = {
-                    "cluster_name": cluster["naam"],
-                    "medications": {}
+            # Als het al een dictionary is, gebruik die
+            if isinstance(data, dict):
+                return data
+                
+            # Als het een string is, probeer het te parsen als JSON
+            if isinstance(data, str):
+                try:
+                    return json.loads(data)
+                except json.JSONDecodeError:
+                    if self.debug_mode:
+                        print(f"Kon string niet parsen als JSON: {data[:100]}...")
+                    return None
+                    
+            # Als het een object is met final_resolution attribuut
+            if hasattr(data, 'final_resolution'):
+                q = data.final_resolution
+                return {
+                    "introductie": getattr(q, "introductie", ""),
+                    "vraag": getattr(q, "vraag", ""),
+                    "antwoordopties": getattr(q, "antwoordopties", []),
+                    "antwoord": getattr(q, "antwoord", ""),
+                    "uitleg": getattr(q, "uitleg", ""),
+                    "categorie": getattr(q, "categorie", "")
                 }
                 
-                for med in cluster["geneesmiddelen"]:
-                    self.stats["total_medications"] += 1
-                    med_name = med["naam"].lower()
-                    try:
-                        info = get_medicine_info(med_name, cluster["naam"])
-                        
-                        if not info or "Geen informatie beschikbaar" in info:
-                            if self.debug_mode:
-                                print(f"\nWaarschuwing: Geen informatie gevonden voor {med_name}, dit medicijn wordt overgeslagen")
-                            self.stats["failed_medications"].append({
-                                "name": med_name,
-                                "cluster": cluster["naam"],
-                                "reason": "Geen informatie beschikbaar"
-                            })
-                            continue
-                            
-                        cluster_info["medications"][med_name] = {
-                            "info": info,
-                            "atc7": med["atc7"],
-                            "brand": med.get("brand", "")
-                        }
-                        self.stats["successful_medications"] += 1
-                    except Exception as med_error:
-                        if self.debug_mode:
-                            print(f"\nFout bij ophalen informatie voor {med_name}: {str(med_error)}")
-                        self.stats["failed_medications"].append({
-                            "name": med_name,
-                            "cluster": cluster["naam"],
-                            "reason": str(med_error)
-                        })
-                        continue
+            # Als het een object is met directe attributen
+            if hasattr(data, 'introductie'):
+                return {
+                    "introductie": getattr(data, "introductie", ""),
+                    "vraag": getattr(data, "vraag", ""),
+                    "antwoordopties": getattr(data, "antwoordopties", []),
+                    "antwoord": getattr(data, "antwoord", ""),
+                    "uitleg": getattr(data, "uitleg", ""),
+                    "categorie": getattr(data, "categorie", "")
+                }
                 
-                # Alleen clusters toevoegen die medicijnen bevatten
-                if cluster_info["medications"]:
-                    all_info[cluster["atc5_code"]] = cluster_info
-                elif self.debug_mode:
-                    print(f"\nWaarschuwing: Geen bruikbare medicijnen gevonden in cluster {cluster['naam']}")
-                
-            if not all_info:
-                raise RuntimeError("Geen informatie gevonden voor alle geselecteerde medicijnen")
-                
-            return all_info
+            if self.debug_mode:
+                print(f"Onbekend data type: {type(data)}")
+            return None
             
         except Exception as e:
-            self.stats["errors"].append(str(e))
-            raise RuntimeError(f"Fout bij ophalen medicatie informatie: {str(e)}")
+            if self.debug_mode:
+                print(f"Fout bij valideren vraag data: {str(e)}")
+            return None
+
+    def generate_question(self, medicine_name: str, medicine_info: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Genereer een quiz vraag voor een medicijn."""
+        try:
+            # Genereer de vraag
+            question = generate_quiz_question(
+                medicine_name=medicine_name,
+                medicine_info=medicine_info,
+                debug_mode=self.debug_mode  # Geef debug_mode door aan generate_quiz_question
+            )
+            
+            if not question:
+                if self.debug_mode:
+                    print("Geen vraag gegenereerd")
+                return None
+
+            # Valideer en converteer de output
+            question_data = self._validate_question_data(question)
+            
+            if not question_data:
+                if self.debug_mode:
+                    print("Vraag data kon niet gevalideerd worden")
+                self.stats_manager.add_error(f"Ongeldige vraag data voor {medicine_name}")
+                return None
+
+            # Controleer of alle verplichte velden aanwezig zijn
+            required_fields = ["introductie", "vraag", "antwoordopties", "antwoord", "uitleg"]
+            missing_fields = [field for field in required_fields if not question_data.get(field)]
+            
+            if missing_fields:
+                if self.debug_mode:
+                    print(f"Ontbrekende velden: {missing_fields}")
+                self.stats_manager.add_error(f"Ontbrekende velden in vraag voor {medicine_name}: {missing_fields}")
+                return None
+
+            # Update statistieken
+            self.stats_manager.add_category(question_data.get("categorie", "onbekend"))
+            self.stats_manager.increment_questions_generated()
+            
+            return question_data
+            
+        except Exception as e:
+            error_msg = f"Fout bij genereren vraag voor {medicine_name}: {str(e)}"
+            if self.debug_mode:
+                print(error_msg)
+            self.stats_manager.add_error(error_msg)
+            return None
+
+# Hoofdpipeline
+class QuizGenerationPipeline:
+    """Coördineert het hele proces van quiz generatie."""
+    def __init__(self, debug_mode: bool = True):
+        load_dotenv()
+        self.debug_mode = debug_mode
+        self.db_manager = DatabaseManager()
+        self.question_generator = QuestionGenerator(debug_mode)
+        self.medication_selector = MedicationSelector()
+
+    def generate_quiz(self, atc_cluster: Optional[str] = None) -> List[Dict[str, Any]]:
+        try:
+            # Select medications
+            selected_meds = self.medication_selector.select_medications(atc_cluster)
+            
+            # Save selected medications to database
+            self.db_manager.save_selected_medications(selected_meds)
+
+            # Get medicine information
+            medicine_info = self._get_medicine_information(selected_meds)
+
+            # Generate questions
+            questions = self._generate_questions(medicine_info)
+            return questions
+        except Exception as e:
+            self.db_manager.log_process("error", '', '', f"Fout tijdens quiz generatie: {str(e)}")
+            return []
+
+    def _get_medicine_information(self, medication: Dict[str, Any]) -> Dict[str, Any]:
+        all_info = {}
+        for cluster in medication["selected_clusters"]:
+            self.question_generator.stats_manager.increment_clusters_processed()
+            cluster_info = {
+                "cluster_name": cluster["naam"],
+                "medications": {}
+            }
+            
+            for med in cluster["geneesmiddelen"]:
+                self.question_generator.stats_manager.increment_total_medications()
+                med_name = med["naam"].lower()
+                brand_name = med.get("merknaam", None)
+                
+                try:
+                    # Haal eerst de UUID op uit de database
+                    conn = sqlite3.connect(self.db_manager.db_path)
+                    c = conn.cursor()
+                    c.execute('''
+                        SELECT uuid FROM selected_medications 
+                        WHERE medicine_name = ? AND atc7_code = ?
+                    ''', (med["naam"], med["atc7"]))
+                    result = c.fetchone()
+                    
+                    if not result:
+                        raise RuntimeError(f"Geen UUID gevonden voor {med_name}")
+                    med_uuid = result[0]
+                    
+                    info = get_medicine_info(med_name, cluster["naam"], brand_name, debug_mode=self.debug_mode)
+                    
+                    # Converteer string naar dictionary indien nodig
+                    if isinstance(info, str):
+                        try:
+                            # Probeer eerst als JSON te parsen
+                            info = json.loads(info)
+                        except json.JSONDecodeError:
+                            # Als dat niet lukt, maak een basis dictionary
+                            info = {
+                                "url": "",
+                                "date": datetime.now().isoformat(),
+                                "kenniscategorie": "",
+                                "relevant_information": info,
+                                "llm_raw_output": info
+                            }
+                    
+                    if not info or "Geen informatie beschikbaar" in str(info):
+                        self.db_manager.log_process("warning", med_name, '', "Geen informatie gevonden, medicijn overgeslagen")
+                        self.question_generator.stats_manager.add_failed_medication(
+                            med_name, 
+                            cluster["naam"], 
+                            "Geen informatie beschikbaar"
+                        )
+                        continue
+
+                    # Sla de informatie op in de medicine_information tabel
+                    c.execute('''
+                        INSERT INTO medicine_information (
+                            quiz_question_uuid, bron_url, timestamp_opgeslagen,
+                            kenniscategorie, relevante_informatie, llm_raw_output,
+                            timestamp_gegenereerd
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        med_uuid,  # Gebruik de opgehaalde UUID
+                        info.get("url", ""),  # Gebruik 'url' uit dict
+                        info.get("date", ""),  # Gebruik datum uit dict
+                        info.get("kenniscategorie", ""),
+                        info.get("relevant_information", ""),
+                        json.dumps(info),
+                        datetime.now().isoformat()
+                    ))
+                    conn.commit()
+                    conn.close()
+                        
+                    cluster_info["medications"][med_name] = {
+                        "info": info,
+                        "atc7": med["atc7"],
+                        "brand": med.get("merknaam", "")
+                    }
+                    self.question_generator.stats_manager.increment_successful_medications()
+                    
+                except Exception as med_error:
+                    self.db_manager.log_process("error", med_name, '', f"Fout bij ophalen info: {str(med_error)}")
+                    self.question_generator.stats_manager.add_failed_medication(
+                        med_name, 
+                        cluster["naam"], 
+                        str(med_error)
+                    )
+                    continue
+                    
+            if cluster_info["medications"]:
+                all_info[cluster["atc5_code"]] = cluster_info
+                
+        if not all_info:
+            self.db_manager.log_process("error", '', '', "Geen informatie gevonden voor alle geselecteerde medicijnen")
+            raise RuntimeError("Geen informatie gevonden voor alle geselecteerde medicijnen")
+            
+        return all_info
+
+    def _generate_questions(self, medicine_info: Dict[str, Any]) -> List[Dict[str, Any]]:
+        questions = []
+        for atc5, cluster_info in medicine_info.items():
+            for med_name, med_info in cluster_info["medications"].items():
+                try:
+                    question_data = self.question_generator.generate_question(med_name, med_info["info"])
+                    if not question_data:
+                        continue
+                    
+                    # Save to database
+                    self.db_manager.save_information_and_quiz_question(
+                        atc7_code=med_info["atc7"],
+                        kenniscategorie=question_data["categorie"],
+                        bron_url=med_info["info"].get("url", ""),
+                        timestamp_opgeslagen=datetime.now().isoformat(),
+                        geëxtraheerde_informatie=med_info["info"].get("relevant_information", ""),
+                        llm_info_raw_output=json.dumps(med_info),
+                        introductie=question_data["introductie"],
+                        vraag=question_data["vraag"],
+                        antwoordopties=question_data["antwoordopties"],
+                        juiste_antwoord=question_data["antwoord"],
+                        uitleg=question_data["uitleg"],
+                        llm_quiz_raw_output=json.dumps(question_data)
+                    )
+
+                    questions.append({
+                        "question": question_data,
+                        "metadata": {
+                            "medicine_name": med_name,
+                            "atc7": med_info["atc7"],
+                            "atc5": atc5,
+                            "cluster_name": cluster_info["cluster_name"]
+                        }
+                    })
+                except Exception as e:
+                    self.db_manager.log_process("error", med_name, '', f"Fout bij genereren vraag: {str(e)}")
+                    self.question_generator.stats_manager.add_failed_medication(
+                        med_name, 
+                        cluster_info["cluster_name"], 
+                        str(e)
+                    )
+        return questions
 
 def main():
-    """Hoofdfunctie voor het testen van de quiz generatie."""
     try:
-        # Initialiseer de pipeline met debug mode aan
-        pipeline = QuizGenerationPipeline(debug_mode=True)
-        
-        # Genereer de quiz (gebruikt configuratie uit SelectMedication.py)
-        questions = pipeline.generate_quiz()
-        
-        # Toon het rapport
-        print(pipeline.generate_report())
-            
+        # Debug mode instellen voor het hele proces
+        debug_mode = True  # Zet op False om debug output uit te schakelen
+        pipeline = QuizGenerationPipeline(debug_mode=debug_mode)
+        pipeline.generate_quiz()
     except Exception as e:
-        print(f"\nOnverwachte fout: {str(e)}")
+        db_manager = DatabaseManager()
+        db_manager.log_process("fatal_error", '', '', str(e))
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -159,7 +159,7 @@ if __name__ == "__main__":
     medicine_name = "metoprolol"  # Vervang dit door de naam van het medicijn dat je wilt gebruiken
     atc_cluster = "geen"  # Vervang dit door de ATC-clusterNAAM die je wilt gebruiken 
     brand_name = "emcor"
-    DEBUG_MODE = False  # Zet op False om debug-informatie niet af te drukken
+    DEBUG_MODE = True  # Zet op False om debug-informatie niet af te drukken
         
     try:
         medicine_info = get_medicine_info(medicine_name, atc_cluster, brand_name, debug_mode = DEBUG_MODE)

@@ -18,10 +18,16 @@ Set the CACHE_EXPIRATION_DAYS variable to determine when the cached information 
 
 """
 
-# Configuratie
-CACHE_FILE = "medicine_info_cache.json"
+# Constants
+CACHE_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "MedicineInformation.json")
 CACHE_EXPIRATION_DAYS = 30
-DEBUG_MODE = False
+DEBUG_MODE = False  # Set to True to enable debug prints
+
+# Ensure data directory and cache file exist
+os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+if not os.path.exists(CACHE_FILE):
+    with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+        json.dump({}, f)
 
 def debug_print(*args, **kwargs):
     """Print alleen als debug mode aan staat."""
@@ -128,7 +134,7 @@ def ask_for_alternative_url(medicine_name: str, atc_cluster: str, brand_name: st
             print(f"\nJe hebt ervoor gekozen om geen URL op te zoeken. Het medicijn '{medicine_name}' wordt overgeslagen.")
             return None
         elif user_choice == "ja":
-            url = input(f"\n\nGa naar www.apotheek.nl en zoek de pagina met informatie over '{search_name}' uit atc-cluster '{atc_cluster}'.\n\n"
+            url = input(f"\n\nGa naar www.apotheek.nl en zoek de pagina met informatie over {search_name} uit atc-cluster '{atc_cluster}'.\n\n"
                        f"Let op dat de informatie begint met een sectie 'Belangrijk om te weten'.\n\n"
                        f"Plak de volledige URL hier en druk op enter: ").strip()
             if not url:

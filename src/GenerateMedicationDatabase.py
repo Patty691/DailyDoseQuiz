@@ -7,6 +7,9 @@ from langchain_openai import ChatOpenAI
 from typing import Dict, Any, List
 import os
 
+
+# to do: haakjes weggehaald bij merknaam : test of dit goed gaat         !!!!!!
+
 """
 This code generates a JSON file with medication clusters and their statistics.
 
@@ -30,9 +33,8 @@ def adjust_csv():
     split_atc = df["ATC-code"].str.split(" ", n=1, expand=True) #df = dataframe
 
     df["ATC7"] = split_atc[0]  
-    df["geneesmiddel"] = split_atc[1].str.extract(r'([^\(\)]+)')[0].str.strip()  
-    df["merknaam"] = df["ATC-code"].str.extract(r'(\(.*\))')[0] 
-
+    df["geneesmiddel"] = split_atc[1].str.extract(r'([^\(\)]+)')[0].str.strip()   
+    df["merknaam"] = df["ATC-code"].str.extract(r'\(([^)]*)\)')[0]
     return df 
 
  
